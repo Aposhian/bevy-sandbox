@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-mod utils;
 use std::f32::consts::PI;
+use std::ops::Range;
 
 struct SpriteSheetConfig {
     path: &'static str,
@@ -9,14 +9,6 @@ struct SpriteSheetConfig {
     rows: usize,
     scale_factor: f32
 }
-
-const TIE_MAN_SPRITESHEET: SpriteSheetConfig = SpriteSheetConfig {
-    path: "spritesheet_32x32.png",
-    tile_size: Vec2::new(0.0,0.0),
-    columns: 3,
-    rows: 4,
-    scale_factor: 3.0
-};
 
 #[derive(Default)]
 struct MoveAction {
@@ -33,24 +25,21 @@ enum MoveAnimationSet {
 
 #[derive(Clone)]
 pub struct AnimationEffect {
-    frames: std::iter::Cycle<u32>,
+    frames: std::iter::Cycle<std::ops::Range<u32>>,
     flip_x: bool
 }
 
-const QUADRANT_BOUNDS : [f32; 3] = [
-    Bounds {
-        lower: 0.0,
-        upper: PI/4.0
-    },
-    Bounds {
-        lower: PI/4.0,
-        upper: 3.0*PI/4.0
-    },
-    Bounds {
-        lower: 3.0*PI/4.0,
-        upper: PI
+impl Default for AnimationEffect {
+    fn default() -> Self {
+        AnimationEffect {
+            frames: (0..0).cycle(),
+            flip_x: false
+        }
     }
-];
+}
+
+const RIGHT_QUADRANT_BOUNDS : Range<f32> = 0.0..PI/4.0;
+const VERTICAL_QUADRANT_BOUNDS : Range<f32> = RIGHT_QUADRANT_BOUNDS.end..3.0*PI/4.0;
 
 impl From<&MoveAction> for MoveAnimationSet {
     fn from(value: &MoveAction) -> Self {
@@ -58,12 +47,17 @@ impl From<&MoveAction> for MoveAnimationSet {
 
         match value.velocity.max_element() {
             0.0 | -0.0 => MoveAnimationSet::STATIONARY,
-            _ => match angle.which_bounds(QUADRANT_BOUNDS) {
-                0 => MoveAnimationSet::RIGHT,
-                1 if value.velocity.y > 0.0 => MoveAnimationSet::UP,
-                1 if value.velocity.y <= 0.0 => MoveAnimationSet::DOWN,
-                2 | _ => MoveAnimationSet::LEFT
-            }
+            _ => if RIGHT_QUADRANT_BOUNDS.contains(&angle) {
+                    MoveAnimationSet::RIGHT
+                } else if VERTICAL_QUADRANT_BOUNDS.contains(&angle) {
+                    if value.velocity.y > 0.0 {
+                        MoveAnimationSet::UP
+                    } else {
+                        MoveAnimationSet::DOWN
+                    }
+                } else {
+                    MoveAnimationSet::LEFT
+                }
         }
     }
 }
@@ -110,48 +104,41 @@ impl Default for AutoInput {
 
 pub struct TieManTag;
 
-const TIE_MAN_RIGHT : AnimationEffect = AnimationEffect {
-    frames: (9_u32..11).cycle(),
-    flip_x: false
-};
-
-const TIE_MAN_LEFT : AnimationEffect = AnimationEffect {
-    frames: (9_u32..11).cycle(),
-    flip_x: true
-};
-
-const TIE_MAN_UP : AnimationEffect = AnimationEffect {
-    frames: (6_u32..9).cycle(),
-    flip_x: false
-};
-
-const TIE_MAN_DOWN : AnimationEffect = AnimationEffect {
-    frames: (0_u32..3).cycle(),
-    flip_x: false
-};
-
+/// Converts [MoveAction] into [AnimationEffect] for entities with [TieManTag]
 fn tie_man_animation_control_system(
     mut query: Query<(&TieManTag, &MoveAction, &mut AnimationEffect)>
 ) {
-    for (tag, move_action, mut animation) in query.iter_mut() {
-        animation = match MoveAnimationSet::from(move_action) {
-            MoveAnimationSet::RIGHT => TIE_MAN_RIGHT,
-            MoveAnimationSet::LEFT => TIE_MAN_LEFT,
-            MoveAnimationSet::DOWN | MoveAnimationSet::STATIONARY => TIE_MAN_DOWN,
-            MoveAnimationSet::UP => TIE_MAN_UP
-        };
+    for (_tag, move_action, mut animation) in query.iter_mut() {
+        *animation = match MoveAnimationSet::from(move_action) {
+            MoveAnimationSet::RIGHT => AnimationEffect {
+                frames: (9..11).cycle(),
+                flip_x: false
+            },
+            MoveAnimationSet::LEFT => AnimationEffect {
+                frames: (9..11).cycle(),
+                flip_x: true
+            },
+            MoveAnimationSet::DOWN | MoveAnimationSet::STATIONARY => AnimationEffect {
+                frames: (6..9).cycle(),
+                flip_x: false
+            },
+            MoveAnimationSet::UP => AnimationEffect {
+                frames: (0..3).cycle(),
+                flip_x: false
+            }
+        }
     }
 }
 
-// Runs sprite animations based on Animation components
+/// Runs [TextureAtlasSprite] animations based on [AnimationEffect] component
 fn animate_system(
     time: Res<Time>,
-    mut query: Query<(&mut Timer, &mut TextureAtlasSprite, &AnimationEffect)>,
+    mut query: Query<(&mut Timer, &mut TextureAtlasSprite, &mut AnimationEffect)>,
 ) {
-    for (mut timer, mut sprite, animation) in query.iter_mut() {
+    for (mut timer, mut sprite, mut animation) in query.iter_mut() {
         timer.tick(time.delta());
         if timer.finished() {
-            sprite.index = animation.frames.next();
+            sprite.index = animation.frames.next().unwrap();
             sprite.flip_x = animation.flip_x;
         }
     }
@@ -163,7 +150,7 @@ fn movement_system(
     mut query: Query<(&MoveAction, &mut Transform)>,
 ) {
     for (move_action, mut transform) in query.iter_mut() {
-        transform.translation += time.delta_seconds() * move_action.velocity;
+        transform.translation += time.delta_seconds() * move_action.velocity.extend(0.0);
     }
 }
 
@@ -200,13 +187,13 @@ fn auto_input_system(
     mut query: Query<(&mut MoveAction, &AutoInput)>,
 ) {
     for (mut move_action, auto_input) in query.iter_mut() {
-        move_action = auto_input.into();
+        *move_action = auto_input.into();
     }
 }
 
 fn get_texture_atlas(asset_server: &Res<AssetServer>, sprite_sheet: &SpriteSheetConfig) -> TextureAtlas {
     let texture_handle = asset_server.load(sprite_sheet.path);
-    TextureAtlas::from_grid(texture_handle, sprite_sheet.tile_size, sprite_sheet.columns, sprite_sheet.rows);
+    TextureAtlas::from_grid(texture_handle, sprite_sheet.tile_size, sprite_sheet.columns, sprite_sheet.rows)
 }
 
 fn setup(
@@ -214,14 +201,22 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
-    let texture_atlas = get_texture_atlas(&asset_server, &TIE_MAN_SPRITESHEET);
+    let tie_man_spritesheet: SpriteSheetConfig = SpriteSheetConfig {
+        path: "tie_man_32x32.png",
+        tile_size: Vec2::new(0.0,0.0),
+        columns: 3,
+        rows: 4,
+        scale_factor: 3.0
+    };
+
+    let texture_atlas = get_texture_atlas(&asset_server, &tie_man_spritesheet);
     let texture_atlas_handle =  texture_atlases.add(texture_atlas);
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands
         .spawn_bundle(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle.clone(),
-            transform: Transform::from_scale(Vec3::splat(TIE_MAN_SPRITESHEET.scale_factor)),
+            transform: Transform::from_scale(Vec3::splat(tie_man_spritesheet.scale_factor)),
             ..Default::default()
         })
         .insert(AutoInput {
@@ -230,13 +225,13 @@ fn setup(
         })
         .insert(MoveAction::default())
         .insert(TieManTag)
-        .insert(TIE_MAN_DOWN.clone())
+        .insert(AnimationEffect::default())
         .insert(Timer::from_seconds(0.1, true));
 
     commands
         .spawn_bundle(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle.clone(),
-            transform: Transform::from_scale(Vec3::splat(TIE_MAN_SPRITESHEET.scale_factor)),
+            transform: Transform::from_scale(Vec3::splat(tie_man_spritesheet.scale_factor)),
             ..Default::default()
         })
         .insert(KeyboardInputBinding {
@@ -245,6 +240,6 @@ fn setup(
         })
         .insert(MoveAction::default())
         .insert(TieManTag)
-        .insert(TIE_MAN_DOWN.clone())
+        .insert(AnimationEffect::default())
         .insert(Timer::from_seconds(0.1, true));
 }
