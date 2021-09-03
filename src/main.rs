@@ -1,14 +1,9 @@
-use bevy::prelude::*;
-
-mod core;
-mod input;
-mod tie_man;
+use bevy::prelude::{App, DefaultPlugins};
+use bevy_sandbox::SandboxPlugins;
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
-        .add_startup_system(core::setup::setup.system())
-        .add_plugins(core::plugins::CorePlugin)
-        .add_plugins(tie_man::plugins::PlayerPlugin)
+        .add_plugins(SandboxPlugins)
         .run();
 }
