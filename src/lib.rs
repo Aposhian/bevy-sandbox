@@ -4,6 +4,10 @@ use bevy::render::pass::ClearColor;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
+mod tie_man;
+
+use tie_man::TieManPlugin;
+
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -11,6 +15,8 @@ impl PluginGroup for SandboxPlugins {
         group.add(AnimationPlugin);
         group.add(RapierPhysicsPlugin::<NoUserData>::default());
         group.add(DefaultResources);
+        group.add(DefaultSystems);
+        group.add(TieManPlugin);
     }
 }
 
@@ -25,4 +31,16 @@ impl Plugin for DefaultResources {
             )))
             .insert_resource(Msaa::default());
     }
+}
+
+pub struct DefaultSystems;
+
+impl Plugin for DefaultSystems {
+    fn build(&self, app: &mut AppBuilder) {
+        app.add_startup_system(setup.system());
+    }
+}
+
+fn setup(mut commands: Commands) {
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 }
