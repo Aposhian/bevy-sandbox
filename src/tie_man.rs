@@ -40,6 +40,7 @@ pub fn get_texture_atlas(asset_server: &AssetServer, sprite_sheet: &SpriteSheetC
     TextureAtlas::from_grid(texture_handle, Vec2::from(sprite_sheet.tile_size), sprite_sheet.columns, sprite_sheet.rows)
 }
 
+/// Resource for holding texture atlas
 pub struct TieManTextureAtlasHandle {
     handle: Handle<TextureAtlas>
 }
@@ -56,6 +57,7 @@ impl FromWorld for TieManTextureAtlasHandle {
     }
 }
 
+/// Resource for holding animation handles
 pub struct TieManAnimationHandles {
     front_stationary: Handle<SpriteSheetAnimation>,
     profile_stationary: Handle<SpriteSheetAnimation>,
@@ -94,30 +96,47 @@ fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
 
 pub struct TieManTag;
 
+#[derive(Bundle)]
+pub struct TieManBundle {
+    tag: TieManTag,
+    #[bundle]
+    sprite_sheet_bundle: SpriteSheetBundle,
+    animation: Handle<SpriteSheetAnimation>,
+    play: Play,
+    #[bundle]
+    rigid_body_bundle: RigidBodyBundle,
+    position_sync: RigidBodyPositionSync,
+    #[bundle]
+    collider_bundle: ColliderBundle,
+    move_action: MoveAction
+}
+
 fn spawn(mut commands: Commands,
     texture_atlas_handle: Res<TieManTextureAtlasHandle>,
     animations: Res<TieManAnimationHandles>) {
-    commands.spawn_bundle(SpriteSheetBundle {
-        texture_atlas: texture_atlas_handle.handle.clone(),
-        transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
-        ..Default::default()
-    })
-    .insert_bundle(RigidBodyBundle {
-        forces: RigidBodyForces {
-            gravity_scale: 0.0,
+    commands.spawn_bundle(TieManBundle {
+        tag: TieManTag,
+        sprite_sheet_bundle: SpriteSheetBundle {
+            texture_atlas: texture_atlas_handle.handle.clone(),
+            transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
             ..Default::default()
         },
-        ..Default::default()
-    })
-    .insert_bundle(ColliderBundle {
-        shape: ColliderShape::cuboid(1.0, 1.0),
-        ..Default::default()
-    })
-    .insert(RigidBodyPositionSync::Discrete)
-    .insert(animations.front_stationary.clone())
-    .insert(Play)
-    .insert(MoveAction::default())
-    .insert(TieManTag);
+        animation: animations.front_stationary.clone(),
+        play: Play,
+        rigid_body_bundle: RigidBodyBundle {
+            forces: RigidBodyForces {
+                gravity_scale: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        position_sync: RigidBodyPositionSync::Discrete,
+        collider_bundle: ColliderBundle {
+            shape: ColliderShape::cuboid(1.0, 1.0),
+            ..Default::default()
+        },
+        move_action: MoveAction::default()
+    });
 }
 
 fn animation_control(
