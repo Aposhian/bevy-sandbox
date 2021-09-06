@@ -8,7 +8,12 @@ pub struct TieManPlugin;
 
 impl Plugin for TieManPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(spawn.system());
+        app
+            .init_resource::<TieManTextureAtlasHandle>()
+            .init_resource::<TieManAnimationHandles>()
+            .add_startup_system(add_texture_atlas.system())
+            .add_startup_system(add_animations.system())
+            .add_startup_system(spawn.system());
     }
 }
 
@@ -28,26 +33,66 @@ const SPRITE_SHEET: SpriteSheetConfig = SpriteSheetConfig {
     scale_factor: 3.0
 };
 
-pub fn get_texture_atlas(asset_server: &Res<AssetServer>, sprite_sheet: &SpriteSheetConfig) -> TextureAtlas {
+pub fn get_texture_atlas(asset_server: Res<AssetServer>, sprite_sheet: &SpriteSheetConfig) -> TextureAtlas {
     let texture_handle = asset_server.load(sprite_sheet.path);
     TextureAtlas::from_grid(texture_handle, Vec2::from(sprite_sheet.tile_size), sprite_sheet.columns, sprite_sheet.rows)
 }
 
-fn spawn(mut commands: Commands,
+#[derive(Default)]
+pub struct TieManTextureAtlasHandle {
+    handle: Handle<TextureAtlas>
+}
+
+pub fn add_texture_atlas(
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut animations: ResMut<Assets<SpriteSheetAnimation>>) {
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>
+) {
+    let texture_atlas = get_texture_atlas(asset_server, &SPRITE_SHEET);
+    commands.insert_resource(TieManTextureAtlasHandle {
+        handle: texture_atlases.add(texture_atlas)
+    });
+}
 
-    let texture_atlas = get_texture_atlas(&asset_server, &SPRITE_SHEET);
-    let texture_atlas_handle =  texture_atlases.add(texture_atlas);
 
-    let animation_handle = animations.add(SpriteSheetAnimation::from_range(
-        0..=2,                               // Indices of the sprite atlas
-        Duration::from_secs_f64(1.0 / 12.0), // Duration of each frame
-    ));
+#[derive(Default)]
+pub struct TieManAnimationHandles {
+    front_stationary: Handle<SpriteSheetAnimation>,
+    profile_stationary: Handle<SpriteSheetAnimation>,
+    back_stationary: Handle<SpriteSheetAnimation>,
+    profile_walk: Handle<SpriteSheetAnimation>
+}
 
+pub fn add_animations(
+    mut commands: Commands,
+    mut animations: ResMut<Assets<SpriteSheetAnimation>>
+) {
+    commands.insert_resource(TieManAnimationHandles {
+        front_stationary: animations.add(SpriteSheetAnimation::from_range(
+            0..=2,
+            Duration::from_millis(100)
+        )),
+        profile_stationary: animations.add(SpriteSheetAnimation::from_range(
+            3..=5,
+            Duration::from_millis(100)
+        )),
+        back_stationary: animations.add(SpriteSheetAnimation::from_range(
+            6..=8,
+            Duration::from_millis(100)
+        )),
+        profile_walk: animations.add(SpriteSheetAnimation::from_range(
+            9..=11,
+            Duration::from_millis(100)
+        ))
+    });
+}
+
+fn spawn(
+    mut commands: Commands,
+    texture_atlas_handle: Res<TieManTextureAtlasHandle>,
+    animations: Res<TieManAnimationHandles>) {
     commands.spawn_bundle(SpriteSheetBundle {
-        texture_atlas: texture_atlas_handle,
+        texture_atlas: texture_atlas_handle.handle.clone(),
         transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
         ..Default::default()
     })
@@ -56,6 +101,6 @@ fn spawn(mut commands: Commands,
         ..Default::default()
     })
     .insert(ColliderPositionSync::Discrete)
-    .insert(animation_handle)
+    .insert(animations.front_stationary.clone())
     .insert(Play);
 }
