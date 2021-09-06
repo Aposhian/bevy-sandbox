@@ -4,6 +4,8 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use benimator::{Play, SpriteSheetAnimation};
 
+use crate::input::MoveAction;
+
 pub struct TieManPlugin;
 
 impl Plugin for TieManPlugin {
@@ -11,7 +13,9 @@ impl Plugin for TieManPlugin {
         app
             .init_resource::<TieManTextureAtlasHandle>()
             .init_resource::<TieManAnimationHandles>()
-            .add_startup_system(spawn.system());
+            .add_startup_system(setup_physics.system())
+            .add_startup_system(spawn.system())
+            .add_system(animation_control.system());
     }
 }
 
@@ -83,6 +87,13 @@ impl FromWorld for TieManAnimationHandles {
     }
 }
 
+fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
+    // This is pixels per physics meter
+    configuration.scale = 50.0;
+}
+
+pub struct TieManTag;
+
 fn spawn(mut commands: Commands,
     texture_atlas_handle: Res<TieManTextureAtlasHandle>,
     animations: Res<TieManAnimationHandles>) {
@@ -91,11 +102,38 @@ fn spawn(mut commands: Commands,
         transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
         ..Default::default()
     })
+    .insert_bundle(RigidBodyBundle {
+        forces: RigidBodyForces {
+            gravity_scale: 0.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    })
     .insert_bundle(ColliderBundle {
         shape: ColliderShape::cuboid(1.0, 1.0),
         ..Default::default()
     })
-    .insert(ColliderPositionSync::Discrete)
+    .insert(RigidBodyPositionSync::Discrete)
     .insert(animations.front_stationary.clone())
-    .insert(Play);
+    .insert(Play)
+    .insert(MoveAction::default())
+    .insert(TieManTag);
+}
+
+fn animation_control(
+    animation_handles: Res<TieManAnimationHandles>,
+    mut query: Query<(&TieManTag, &RigidBodyVelocity, &mut TextureAtlasSprite, &mut Handle<SpriteSheetAnimation>)>) {
+    for (_tag, velocity, mut sprite, mut animation) in query.iter_mut() {
+        if velocity.linvel.x == 0.0 {
+            *animation = animation_handles.profile_stationary.clone();
+        } else {
+            *animation = animation_handles.profile_walk.clone();
+        }
+
+        if velocity.linvel.x < 0.0 {
+            sprite.flip_x = true;
+        } else if velocity.linvel.x > 0.0 {
+            sprite.flip_x = false;
+        }
+    }
 }

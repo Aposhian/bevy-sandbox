@@ -5,8 +5,10 @@ use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
 mod tie_man;
+mod input;
 
 use tie_man::TieManPlugin;
+use input::InputPlugin;
 
 pub struct SandboxPlugins;
 
@@ -16,6 +18,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(RapierPhysicsPlugin::<NoUserData>::default());
         group.add(DefaultResources);
         group.add(DefaultSystems);
+        group.add(InputPlugin);
         group.add(TieManPlugin);
     }
 }
