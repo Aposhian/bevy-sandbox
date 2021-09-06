@@ -11,9 +11,13 @@ impl Plugin for TieManPlugin {
         app
             .init_resource::<TieManTextureAtlasHandle>()
             .init_resource::<TieManAnimationHandles>()
-            .add_startup_system(add_texture_atlas.system())
-            .add_startup_system(add_animations.system())
-            .add_startup_system(spawn.system());
+            .add_startup_system(add_texture_atlas.system().label("tie_man_texture_atlas"))
+            .add_startup_system(add_animations.system().label("tie_man_animations"))
+            .add_startup_system(
+                spawn.system()
+                    .after("tie_man_texture_atlas")
+                    .after("tie_man_animations")
+            );
     }
 }
 
