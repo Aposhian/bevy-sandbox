@@ -4,10 +4,10 @@ use bevy::render::pass::ClearColor;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
-mod tie_man;
+mod simple_figure;
 mod input;
 
-use tie_man::TieManPlugin;
+use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;
 
 pub struct SandboxPlugins;
@@ -19,7 +19,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(DefaultResources);
         group.add(DefaultSystems);
         group.add(InputPlugin);
-        group.add(TieManPlugin);
+        group.add(SimpleFigurePlugin);
     }
 }
 

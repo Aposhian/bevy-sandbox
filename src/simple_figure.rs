@@ -3,16 +3,17 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use benimator::{Play, SpriteSheetAnimation};
+use std::f32::consts::FRAC_PI_4;
 
 use crate::input::MoveAction;
 
-pub struct TieManPlugin;
+pub struct SimpleFigurePlugin;
 
-impl Plugin for TieManPlugin {
+impl Plugin for SimpleFigurePlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
-            .init_resource::<TieManTextureAtlasHandle>()
-            .init_resource::<TieManAnimationHandles>()
+            .init_resource::<SimpleFigureTextureAtlasHandle>()
+            .init_resource::<SimpleFigureAnimationHandles>()
             .add_startup_system(setup_physics.system())
             .add_startup_system(spawn.system())
             .add_system(animation_control.system());
@@ -28,10 +29,10 @@ pub struct SpriteSheetConfig {
 }
 
 const SPRITE_SHEET: SpriteSheetConfig = SpriteSheetConfig {
-    path: "tie_man_32x32.png",
+    path: "simple_figure_32x32.png",
     tile_size: (32.0,32.0),
     columns: 3,
-    rows: 4,
+    rows: 6,
     scale_factor: 3.0
 };
 
@@ -41,50 +42,86 @@ pub fn get_texture_atlas(asset_server: &AssetServer, sprite_sheet: &SpriteSheetC
 }
 
 /// Resource for holding texture atlas
-pub struct TieManTextureAtlasHandle {
+pub struct SimpleFigureTextureAtlasHandle {
     handle: Handle<TextureAtlas>
 }
 
-impl FromWorld for TieManTextureAtlasHandle {
+impl FromWorld for SimpleFigureTextureAtlasHandle {
     fn from_world(world: &mut World) -> Self {
         let asset_server = world.get_resource::<AssetServer>().unwrap();
         let texture_atlas = get_texture_atlas(asset_server, &SPRITE_SHEET);
         let mut texture_atlases = world.get_resource_mut::<Assets<TextureAtlas>>().unwrap();
         let texture_atlas_handle = texture_atlases.add(texture_atlas);
-        TieManTextureAtlasHandle {
+        SimpleFigureTextureAtlasHandle {
             handle: texture_atlas_handle
         }
     }
 }
 
 /// Resource for holding animation handles
-pub struct TieManAnimationHandles {
+pub struct SimpleFigureAnimationHandles {
     front_stationary: Handle<SpriteSheetAnimation>,
+    front_walk: Handle<SpriteSheetAnimation>,
     profile_stationary: Handle<SpriteSheetAnimation>,
+    profile_walk: Handle<SpriteSheetAnimation>,
     back_stationary: Handle<SpriteSheetAnimation>,
-    profile_walk: Handle<SpriteSheetAnimation>
+    back_walk: Handle<SpriteSheetAnimation>
 }
 
-impl FromWorld for TieManAnimationHandles {
+impl SimpleFigureAnimationHandles {
+    fn walking(&self, velocity: Vec2) -> &Handle<SpriteSheetAnimation> {
+        assert!(velocity.length_squared() != 0.0);
+        let angle = velocity.angle_between(Vec2::new(1.0, 0.0));
+        if angle <= FRAC_PI_4 {
+            &self.profile_walk
+        } else {
+            if velocity.y >= 0.0 {
+                &self.back_walk
+            } else {
+                &self.front_walk
+            }
+        }
+    }
+
+    fn stationary(&self, previous_handle: &Handle<SpriteSheetAnimation>) -> &Handle<SpriteSheetAnimation> {
+        if [self.profile_walk.id, self.profile_stationary.id].contains(&previous_handle.id) {
+            &self.profile_stationary
+        } else if [self.back_walk.id, self.back_stationary.id].contains(&previous_handle.id) {
+            &self.back_stationary
+        } else {
+            &self.front_stationary
+        }
+    }
+}
+
+impl FromWorld for SimpleFigureAnimationHandles {
     fn from_world(world: &mut World) -> Self {
         let mut animations = world.get_resource_mut::<Assets<SpriteSheetAnimation>>().unwrap();
-        TieManAnimationHandles {
+        SimpleFigureAnimationHandles {
             front_stationary: animations.add(SpriteSheetAnimation::from_range(
                 0..=2,
                 Duration::from_millis(100)
             )),
-            profile_stationary: animations.add(SpriteSheetAnimation::from_range(
+            front_walk: animations.add(SpriteSheetAnimation::from_range(
                 3..=5,
                 Duration::from_millis(100)
             )),
-            back_stationary: animations.add(SpriteSheetAnimation::from_range(
+            profile_stationary: animations.add(SpriteSheetAnimation::from_range(
                 6..=8,
                 Duration::from_millis(100)
             )),
             profile_walk: animations.add(SpriteSheetAnimation::from_range(
                 9..=11,
                 Duration::from_millis(100)
-            ))
+            )),
+            back_stationary: animations.add(SpriteSheetAnimation::from_range(
+                12..=14,
+                Duration::from_millis(100)
+            )),
+            back_walk: animations.add(SpriteSheetAnimation::from_range(
+                15..=17,
+                Duration::from_millis(100)
+            )),
         }
     }
 }
@@ -94,11 +131,11 @@ fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
     configuration.scale = 50.0;
 }
 
-pub struct TieManTag;
+pub struct SimpleFigureTag;
 
 #[derive(Bundle)]
-pub struct TieManBundle {
-    tag: TieManTag,
+pub struct SimpleFigureBundle {
+    tag: SimpleFigureTag,
     #[bundle]
     sprite_sheet_bundle: SpriteSheetBundle,
     animation: Handle<SpriteSheetAnimation>,
@@ -112,10 +149,10 @@ pub struct TieManBundle {
 }
 
 fn spawn(mut commands: Commands,
-    texture_atlas_handle: Res<TieManTextureAtlasHandle>,
-    animations: Res<TieManAnimationHandles>) {
-    commands.spawn_bundle(TieManBundle {
-        tag: TieManTag,
+    texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
+    animations: Res<SimpleFigureAnimationHandles>) {
+    commands.spawn_bundle(SimpleFigureBundle {
+        tag: SimpleFigureTag,
         sprite_sheet_bundle: SpriteSheetBundle {
             texture_atlas: texture_atlas_handle.handle.clone(),
             transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
@@ -140,13 +177,13 @@ fn spawn(mut commands: Commands,
 }
 
 fn animation_control(
-    animation_handles: Res<TieManAnimationHandles>,
-    mut query: Query<(&TieManTag, &RigidBodyVelocity, &mut TextureAtlasSprite, &mut Handle<SpriteSheetAnimation>)>) {
+    animation_handles: Res<SimpleFigureAnimationHandles>,
+    mut query: Query<(&SimpleFigureTag, &RigidBodyVelocity, &mut TextureAtlasSprite, &mut Handle<SpriteSheetAnimation>)>) {
     for (_tag, velocity, mut sprite, mut animation) in query.iter_mut() {
-        if velocity.linvel.x == 0.0 {
-            *animation = animation_handles.profile_stationary.clone();
+        if Vec2::from(velocity.linvel).length_squared() == 0.0 {
+            *animation = animation_handles.stationary(&animation).clone();
         } else {
-            *animation = animation_handles.profile_walk.clone();
+            *animation = animation_handles.walking(velocity.linvel.into()).clone();
         }
 
         if velocity.linvel.x < 0.0 {

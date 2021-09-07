@@ -43,7 +43,7 @@ fn keyboard(
         desired_velocity.x += 1.0;
     }
 
-    player_action.desired_velocity = if desired_velocity.length() != 0.0 {
+    player_action.desired_velocity = if desired_velocity.length_squared() != 0.0 {
         desired_velocity.normalize()
     } else {
         desired_velocity
