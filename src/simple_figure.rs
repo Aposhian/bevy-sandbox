@@ -72,7 +72,7 @@ impl SimpleFigureAnimationHandles {
     fn walking(&self, velocity: Vec2) -> &Handle<SpriteSheetAnimation> {
         assert!(velocity.length_squared() != 0.0);
         let angle = velocity.angle_between(Vec2::new(1.0, 0.0));
-        if angle <= FRAC_PI_4 {
+        if (-FRAC_PI_4 <= angle && angle <= FRAC_PI_4) || (3.0 * FRAC_PI_4 <= angle || angle <= - 3.0 * FRAC_PI_4) {
             &self.profile_walk
         } else {
             if velocity.y >= 0.0 {
