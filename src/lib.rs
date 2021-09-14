@@ -4,12 +4,13 @@ use bevy::render::pass::ClearColor;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
-mod simple_figure;
+pub mod simple_figure;
 mod input;
+pub mod obstacle;
 
 use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;
-
+use obstacle::ObstaclePlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -20,6 +21,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(DefaultSystems);
         group.add(InputPlugin);
         group.add(SimpleFigurePlugin);
+        group.add(ObstaclePlugin);
     }
 }
 

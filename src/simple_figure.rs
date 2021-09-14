@@ -1,11 +1,12 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use bevy::ecs::system::EntityCommands;
 use bevy_rapier2d::prelude::*;
 use benimator::{Play, SpriteSheetAnimation};
 use std::f32::consts::FRAC_PI_4;
 
-use crate::input::MoveAction;
+use crate::input::{PlayerTag, MoveAction};
 
 pub struct SimpleFigurePlugin;
 
@@ -15,7 +16,6 @@ impl Plugin for SimpleFigurePlugin {
             .init_resource::<SimpleFigureTextureAtlasHandle>()
             .init_resource::<SimpleFigureAnimationHandles>()
             .add_startup_system(setup_physics.system())
-            .add_startup_system(spawn.system())
             .add_system(animation_control.system());
     }
 }
@@ -128,7 +128,7 @@ impl FromWorld for SimpleFigureAnimationHandles {
 
 fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
     // This is pixels per physics meter
-    configuration.scale = 50.0;
+    configuration.scale = 32.0;
 }
 
 pub struct SimpleFigureTag;
@@ -148,9 +148,22 @@ pub struct SimpleFigureBundle {
     move_action: MoveAction
 }
 
-fn spawn(mut commands: Commands,
+pub fn spawn(mut commands: Commands,
     texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
     animations: Res<SimpleFigureAnimationHandles>) {
+    _spawn(&mut commands, texture_atlas_handle, animations);
+}
+
+pub fn spawn_playable(mut commands: Commands,
+    texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
+    animations: Res<SimpleFigureAnimationHandles>) {
+    _spawn(&mut commands, texture_atlas_handle, animations)
+        .insert(PlayerTag);
+}
+
+pub fn _spawn<'a, 'b>(commands: &'b mut Commands<'a>,
+    texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
+    animations: Res<SimpleFigureAnimationHandles>) -> EntityCommands<'a, 'b> {
     commands.spawn_bundle(SimpleFigureBundle {
         tag: SimpleFigureTag,
         sprite_sheet_bundle: SpriteSheetBundle {
@@ -161,6 +174,7 @@ fn spawn(mut commands: Commands,
         animation: animations.front_stationary.clone(),
         play: Play,
         rigid_body_bundle: RigidBodyBundle {
+            mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
             forces: RigidBodyForces {
                 gravity_scale: 0.0,
                 ..Default::default()
@@ -169,11 +183,11 @@ fn spawn(mut commands: Commands,
         },
         position_sync: RigidBodyPositionSync::Discrete,
         collider_bundle: ColliderBundle {
-            shape: ColliderShape::cuboid(1.0, 1.0),
+            shape: ColliderShape::cuboid(0.8, 1.0),
             ..Default::default()
         },
         move_action: MoveAction::default()
-    });
+    })
 }
 
 fn animation_control(
