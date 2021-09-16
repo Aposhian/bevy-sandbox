@@ -1,0 +1,212 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'bevy_sandbox'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "bevy_sandbox",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'bevy_sandbox'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bevy_sandbox",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "bevy_sandbox",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'bevy_sandbox'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=bevy_sandbox",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "bevy_sandbox",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'empty'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=empty",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "empty",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'empty'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=empty",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "empty",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'player'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=player",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "player",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'player'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=player",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "player",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'obstacle'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=obstacle",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "obstacle",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'obstacle'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=obstacle",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "obstacle",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'ldtk'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=ldtk",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "ldtk",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'ldtk'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=ldtk",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "ldtk",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -5,7 +5,7 @@ authors = ["Adam Aposhian <aposhian.dev@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-bevy = { version = "0.5.0", features = ["dynamic", "bevy_wgpu", "bevy_winit"] }
+bevy = { version = "0.5.0", features = ["bevy_wgpu", "bevy_winit"] }
 benimator = "^0.3"
 bevy_rapier2d = "^0.11"
 bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap.git", features = ["ldtk"] }

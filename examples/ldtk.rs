@@ -18,7 +18,7 @@ fn startup(
         .insert_bundle(LdtkMapBundle {
             ldtk_map: handle,
             map: Map::new(0u16, map_entity),
-            transform: Transform::from_scale(Vec3::splat(2.0)),
+            transform: Transform::from_scale(Vec3::splat(1.0)),
             ..Default::default()
         });
 }
