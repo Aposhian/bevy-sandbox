@@ -25,3 +25,7 @@ path = "examples/obstacle.rs"
 [[example]]
 name = "ldtk"
 path = "examples/ldtk.rs"
+
+[[example]]
+name = "ldtk_entities"
+path = "examples/ldtk_entities.rs"
