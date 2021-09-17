@@ -3,12 +3,12 @@
 use bevy::prelude::*;
 use bevy_sandbox::SandboxPlugins;
 
-use bevy_sandbox::simple_figure::spawn_playable;
+use bevy_sandbox::simple_figure::default_spawn;
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
         .add_plugins(SandboxPlugins)
-        .add_startup_system(spawn_playable.system())
+        .add_startup_system(default_spawn.system())
         .run();
 }

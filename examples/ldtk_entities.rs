@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
-use bevy_sandbox::SandboxPlugins;
+use bevy_sandbox::{SandboxPlugins, simple_figure::SimpleFigureSpawnEvent};
 
 
 fn load_assets(
@@ -23,8 +23,10 @@ fn load_assets(
         });
 }
 
+
 fn spawn_entities(
     mut map_events: EventReader<AssetEvent<LdtkMap>>,
+    mut spawn_writer: EventWriter<SimpleFigureSpawnEvent>,
     maps: Res<Assets<LdtkMap>>,
 ) {
     for event in map_events.iter() {
@@ -37,9 +39,7 @@ fn spawn_entities(
                     for entity in level.layer_instances.as_ref().unwrap()[0].entity_instances.iter() {
                         match entity.identifier.as_str() {
                             "SimpleFigure" => {
-                                for field in entity.field_instances.iter() {
-                                    info!("{}: {:?}", field.identifier, field.value);
-                                }
+                                spawn_writer.send(entity.into());
                             }
                             _ => {
                                 warn!("Unknown entity: {}", entity.identifier);

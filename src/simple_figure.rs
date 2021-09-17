@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::ecs::system::EntityCommands;
 use bevy_rapier2d::prelude::*;
 use benimator::{Play, SpriteSheetAnimation};
 use std::f32::consts::FRAC_PI_4;
+use ldtk_rust::EntityInstance;
 
 use crate::input::{PlayerTag, MoveAction};
 
@@ -15,8 +15,10 @@ impl Plugin for SimpleFigurePlugin {
         app
             .init_resource::<SimpleFigureTextureAtlasHandle>()
             .init_resource::<SimpleFigureAnimationHandles>()
+            .add_event::<SimpleFigureSpawnEvent>()
             .add_startup_system(setup_physics.system())
-            .add_system(animation_control.system());
+            .add_system(animation_control.system())
+            .add_system(spawn.system());
     }
 }
 
@@ -24,16 +26,14 @@ pub struct SpriteSheetConfig {
     path: &'static str,
     tile_size: (f32, f32),
     columns: usize,
-    rows: usize,
-    scale_factor: f32
+    rows: usize
 }
 
 const SPRITE_SHEET: SpriteSheetConfig = SpriteSheetConfig {
     path: "simple_figure_32x32.png",
     tile_size: (32.0,32.0),
     columns: 3,
-    rows: 6,
-    scale_factor: 3.0
+    rows: 6
 };
 
 pub fn get_texture_atlas(asset_server: &AssetServer, sprite_sheet: &SpriteSheetConfig) -> TextureAtlas {
@@ -148,46 +148,86 @@ pub struct SimpleFigureBundle {
     move_action: MoveAction
 }
 
-pub fn spawn(mut commands: Commands,
-    texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
-    animations: Res<SimpleFigureAnimationHandles>) {
-    _spawn(&mut commands, texture_atlas_handle, animations);
+pub struct SimpleFigureSpawnEvent {
+    transform: Transform,
+    playable: bool
 }
 
-pub fn spawn_playable(mut commands: Commands,
-    texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
-    animations: Res<SimpleFigureAnimationHandles>) {
-    _spawn(&mut commands, texture_atlas_handle, animations)
-        .insert(PlayerTag);
+impl Default for SimpleFigureSpawnEvent {
+    fn default() -> Self {
+        SimpleFigureSpawnEvent {
+            transform: Transform::identity(),
+            playable: true
+        }
+    }
 }
 
-pub fn _spawn<'a, 'b>(commands: &'b mut Commands<'a>,
+impl From<&EntityInstance> for SimpleFigureSpawnEvent {
+    fn from(entity: &EntityInstance) -> Self {
+        assert!(entity.identifier.as_str() == "SimpleFigure");
+        let playable = entity.field_instances.iter()
+            .filter_map(|field| {
+                match &field.identifier as &str {
+                    "playable" => {
+                        match field.value {
+                            Some(serde_json::Value::Bool(playable)) => Some(playable),
+                            _ => None
+                        }
+                    },
+                    _ => None
+                }
+            })
+            .next()
+            .unwrap_or(false);
+        SimpleFigureSpawnEvent {
+            playable,
+            transform: Transform::from_xyz(entity.grid[0] as f32, entity.grid[1] as f32, 0.0)
+        }
+    }
+}
+
+pub fn default_spawn(
+    mut spawn_event: EventWriter<SimpleFigureSpawnEvent>
+) {
+    spawn_event.send(SimpleFigureSpawnEvent::default())
+}
+
+/// Spawn entities in response to spawn events
+fn spawn(
+    mut commands: Commands,
     texture_atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
-    animations: Res<SimpleFigureAnimationHandles>) -> EntityCommands<'a, 'b> {
-    commands.spawn_bundle(SimpleFigureBundle {
-        tag: SimpleFigureTag,
-        sprite_sheet_bundle: SpriteSheetBundle {
-            texture_atlas: texture_atlas_handle.handle.clone(),
-            transform: Transform::from_scale(Vec3::splat(SPRITE_SHEET.scale_factor)),
-            ..Default::default()
-        },
-        animation: animations.front_stationary.clone(),
-        play: Play,
-        rigid_body_bundle: RigidBodyBundle {
-            mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
-            forces: RigidBodyForces {
-                gravity_scale: 0.0,
+    animations: Res<SimpleFigureAnimationHandles>,
+    mut spawn_events: EventReader<SimpleFigureSpawnEvent>
+) {
+    for spawn_event in spawn_events.iter() {
+        let mut entity_commands = commands.spawn_bundle(SimpleFigureBundle {
+            tag: SimpleFigureTag,
+            sprite_sheet_bundle: SpriteSheetBundle {
+                texture_atlas: texture_atlas_handle.handle.clone(),
+                transform: spawn_event.transform,
                 ..Default::default()
             },
-            ..Default::default()
-        },
-        position_sync: RigidBodyPositionSync::Discrete,
-        collider_bundle: ColliderBundle {
-            shape: ColliderShape::cuboid(0.8, 1.0),
-            ..Default::default()
-        },
-        move_action: MoveAction::default()
-    })
+            animation: animations.front_stationary.clone(),
+            play: Play,
+            rigid_body_bundle: RigidBodyBundle {
+                mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
+                forces: RigidBodyForces {
+                    gravity_scale: 0.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            position_sync: RigidBodyPositionSync::Discrete,
+            collider_bundle: ColliderBundle {
+                shape: ColliderShape::cuboid(0.8, 1.0),
+                ..Default::default()
+            },
+            move_action: MoveAction::default()
+        });
+        if spawn_event.playable {
+            entity_commands.insert(PlayerTag);
+        }
+    }
 }
 
 fn animation_control(
