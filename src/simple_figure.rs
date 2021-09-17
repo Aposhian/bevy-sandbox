@@ -167,8 +167,8 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
         assert!(entity.identifier.as_str() == "SimpleFigure");
         let playable = entity.field_instances.iter()
             .filter_map(|field| {
-                match &field.identifier as &str {
-                    "playable" => {
+                match field.identifier.as_str() {
+                    "Playable" => {
                         match field.value {
                             Some(serde_json::Value::Bool(playable)) => Some(playable),
                             _ => None
@@ -181,11 +181,14 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
             .unwrap_or(false);
         SimpleFigureSpawnEvent {
             playable,
-            transform: Transform::from_xyz(entity.grid[0] as f32, entity.grid[1] as f32, 0.0)
+            // TODO: refactor this out for all entities
+            // TODO: use more robust system for managing z ordering
+            transform: Transform::from_xyz(entity.grid[0] as f32, entity.grid[1] as f32, 10.0)
         }
     }
 }
 
+/// Should be used for debugging only
 pub fn default_spawn(
     mut spawn_event: EventWriter<SimpleFigureSpawnEvent>
 ) {
