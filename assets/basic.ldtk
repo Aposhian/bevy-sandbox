@@ -35,7 +35,7 @@
 			"identifier": "Entities",
 			"type": "Entities",
 			"uid": 8,
-			"gridSize": 16,
+			"gridSize": 32,
 			"displayOpacity": 1,
 			"pxOffsetX": 0,
 			"pxOffsetY": 0,
@@ -198,9 +198,9 @@
 				{
 					"__identifier": "Entities",
 					"__type": "Entities",
-					"__cWid": 16,
-					"__cHei": 16,
-					"__gridSize": 16,
+					"__cWid": 8,
+					"__cHei": 8,
+					"__gridSize": 32,
 					"__opacity": 1,
 					"__pxTotalOffsetX": 0,
 					"__pxTotalOffsetY": 0,
@@ -221,7 +221,7 @@
 					"entityInstances": [
 						{
 							"__identifier": "SimpleFigure",
-							"__grid": [4,4],
+							"__grid": [2,2],
 							"__pivot": [0.5,0.5],
 							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
 							"width": 32,
@@ -241,7 +241,7 @@
 						},
 						{
 							"__identifier": "SimpleFigure",
-							"__grid": [10,10],
+							"__grid": [5,5],
 							"__pivot": [0.5,0.5],
 							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
 							"width": 32,
@@ -252,7 +252,7 @@
 						},
 						{
 							"__identifier": "SimpleFigure",
-							"__grid": [10,4],
+							"__grid": [5,2],
 							"__pivot": [0.5,0.5],
 							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
 							"width": 32,
@@ -263,7 +263,7 @@
 						},
 						{
 							"__identifier": "SimpleFigure",
-							"__grid": [4,12],
+							"__grid": [2,6],
 							"__pivot": [0.5,0.5],
 							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
 							"width": 32,
