@@ -2,6 +2,7 @@
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use bevy_rapier2d::prelude::*;
 
 use bevy_sandbox::{SandboxPlugins, simple_figure::SimpleFigureSpawnEvent};
 
@@ -23,6 +24,21 @@ fn load_assets(
         });
 }
 
+fn add_colliders(
+    mut commands: Commands,
+    tile_query: Query<(Entity, &Tile), Added<Tile>>,
+) {
+    for (entity, tile) in tile_query.iter() {
+        if tile.texture_index == 0 {
+            commands.entity(entity)
+                .insert_bundle(ColliderBundle {
+                    shape: ColliderShape::cuboid(0.5, 0.5),
+                    ..Default::default()
+                })
+                .insert(ColliderPositionSync::Discrete);
+        }
+    }
+}
 
 fn spawn_entities(
     mut map_events: EventReader<AssetEvent<LdtkMap>>,
@@ -66,5 +82,6 @@ fn main() {
         .add_plugin(LdtkPlugin)
         .add_startup_system(load_assets.system())
         .add_system(spawn_entities.system())
+        .add_system(add_colliders.system())
         .run();
 }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
+use bevy_rapier2d::{na::Isometry2, prelude::*};
 use benimator::{Play, SpriteSheetAnimation};
 use std::f32::consts::FRAC_PI_4;
 use ldtk_rust::EntityInstance;
@@ -149,15 +149,17 @@ pub struct SimpleFigureBundle {
 }
 
 pub struct SimpleFigureSpawnEvent {
-    transform: Transform,
+    position: Isometry2<f32>,
+    scale: f32,
     playable: bool
 }
 
 impl Default for SimpleFigureSpawnEvent {
     fn default() -> Self {
         SimpleFigureSpawnEvent {
-            transform: Transform::identity(),
-            playable: true
+            position: Isometry2::identity(),
+            scale: 1.0,
+            playable: false
         }
     }
 }
@@ -179,11 +181,15 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
             })
             .next()
             .unwrap_or(false);
+        // TODO: use more robust system for managing z ordering
+        // TODO: refactor this out for all entities
         SimpleFigureSpawnEvent {
             playable,
-            // TODO: refactor this out for all entities
-            // TODO: use more robust system for managing z ordering
-            transform: Transform::from_xyz(entity.grid[0] as f32, entity.grid[1] as f32, 10.0)
+            position: Isometry2::new(
+                [entity.grid[0] as f32, -entity.grid[1] as f32].into(),
+                0.0
+            ),
+            ..Default::default()
         }
     }
 }
@@ -192,7 +198,10 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
 pub fn default_spawn(
     mut spawn_event: EventWriter<SimpleFigureSpawnEvent>
 ) {
-    spawn_event.send(SimpleFigureSpawnEvent::default())
+    spawn_event.send(SimpleFigureSpawnEvent {
+        playable: true,
+        ..Default::default()
+    })
 }
 
 /// Spawn entities in response to spawn events
@@ -207,7 +216,7 @@ fn spawn(
             tag: SimpleFigureTag,
             sprite_sheet_bundle: SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.handle.clone(),
-                transform: spawn_event.transform,
+                transform: Transform::from_scale(Vec3::splat(spawn_event.scale)),
                 ..Default::default()
             },
             animation: animations.front_stationary.clone(),
@@ -218,11 +227,12 @@ fn spawn(
                     gravity_scale: 0.0,
                     ..Default::default()
                 },
+                position: spawn_event.position.into(),
                 ..Default::default()
             },
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle {
-                shape: ColliderShape::cuboid(0.8, 1.0),
+                shape: ColliderShape::cuboid(0.5, 0.5),
                 ..Default::default()
             },
             move_action: MoveAction::default()
