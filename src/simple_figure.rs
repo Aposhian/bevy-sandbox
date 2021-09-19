@@ -148,9 +148,11 @@ pub struct SimpleFigureBundle {
     move_action: MoveAction
 }
 
+#[derive(Debug)]
 pub struct SimpleFigureSpawnEvent {
     position: Isometry2<f32>,
     scale: f32,
+    z: f32,
     playable: bool
 }
 
@@ -159,13 +161,15 @@ impl Default for SimpleFigureSpawnEvent {
         SimpleFigureSpawnEvent {
             position: Isometry2::identity(),
             scale: 1.0,
+            z: 0.0,
             playable: false
         }
     }
 }
 
-impl From<&EntityInstance> for SimpleFigureSpawnEvent {
-    fn from(entity: &EntityInstance) -> Self {
+impl From<(&EntityInstance, u16)> for SimpleFigureSpawnEvent {
+    fn from(ldtk_info: (&EntityInstance, u16)) -> Self {
+        let (entity, layer_id) = ldtk_info;
         assert!(entity.identifier.as_str() == "SimpleFigure");
         let playable = entity.field_instances.iter()
             .filter_map(|field| {
@@ -181,7 +185,6 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
             })
             .next()
             .unwrap_or(false);
-        // TODO: use more robust system for managing z ordering
         // TODO: refactor this out for all entities
         SimpleFigureSpawnEvent {
             playable,
@@ -189,6 +192,7 @@ impl From<&EntityInstance> for SimpleFigureSpawnEvent {
                 [entity.grid[0] as f32, -entity.grid[1] as f32].into(),
                 0.0
             ),
+            z: layer_id as f32,
             ..Default::default()
         }
     }
@@ -212,11 +216,12 @@ fn spawn(
     mut spawn_events: EventReader<SimpleFigureSpawnEvent>
 ) {
     for spawn_event in spawn_events.iter() {
+        info!("{:?}", spawn_event);
         let mut entity_commands = commands.spawn_bundle(SimpleFigureBundle {
             tag: SimpleFigureTag,
             sprite_sheet_bundle: SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.handle.clone(),
-                transform: Transform::from_scale(Vec3::splat(spawn_event.scale)),
+                transform: Transform::from_scale(Vec3::splat(spawn_event.scale)) * Transform::from_translation(Vec3::new(0.0, 0.0, spawn_event.z)),
                 ..Default::default()
             },
             animation: animations.front_stationary.clone(),

@@ -57,6 +57,6 @@ fn keyboard(
 fn movement(mut query: Query<(&MoveAction, &mut RigidBodyVelocity)>) {
     for (move_action, mut velocity) in query.iter_mut() {
         // TODO: use forces or impulses rather than setting velocity
-        velocity.linvel = move_action.desired_velocity.into();
+        velocity.linvel = (move_action.desired_velocity * 10.0).into();
     }
 }

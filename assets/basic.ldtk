@@ -227,7 +227,7 @@
 							"width": 32,
 							"height": 32,
 							"defUid": 5,
-							"px": [72,72],
+							"px": [80,80],
 							"fieldInstances": [{
 								"__identifier": "Playable",
 								"__value": true,
@@ -241,24 +241,24 @@
 						},
 						{
 							"__identifier": "SimpleFigure",
-							"__grid": [5,5],
-							"__pivot": [0.5,0.5],
-							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
-							"width": 32,
-							"height": 32,
-							"defUid": 5,
-							"px": [168,168],
-							"fieldInstances": [{ "__identifier": "Playable", "__value": false, "__type": "Bool", "defUid": 9, "realEditorValues": [] }]
-						},
-						{
-							"__identifier": "SimpleFigure",
 							"__grid": [5,2],
 							"__pivot": [0.5,0.5],
 							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
 							"width": 32,
 							"height": 32,
 							"defUid": 5,
-							"px": [168,72],
+							"px": [176,80],
+							"fieldInstances": [{ "__identifier": "Playable", "__value": false, "__type": "Bool", "defUid": 9, "realEditorValues": [] }]
+						},
+						{
+							"__identifier": "SimpleFigure",
+							"__grid": [5,5],
+							"__pivot": [0.5,0.5],
+							"__tile": { "tilesetUid": 7, "srcRect": [0,0,32,32] },
+							"width": 32,
+							"height": 32,
+							"defUid": 5,
+							"px": [176,176],
 							"fieldInstances": [{ "__identifier": "Playable", "__value": false, "__type": "Bool", "defUid": 9, "realEditorValues": [] }]
 						},
 						{
@@ -269,7 +269,7 @@
 							"width": 32,
 							"height": 32,
 							"defUid": 5,
-							"px": [72,200],
+							"px": [80,208],
 							"fieldInstances": [{ "__identifier": "Playable", "__value": false, "__type": "Bool", "defUid": 9, "realEditorValues": [] }]
 						}
 					]
@@ -316,6 +316,7 @@
 						{ "px": [64,128], "src": [0,0], "f": 0, "t": 0, "d": [34] },
 						{ "px": [224,128], "src": [0,0], "f": 0, "t": 0, "d": [39] },
 						{ "px": [0,160], "src": [0,0], "f": 0, "t": 0, "d": [40] },
+						{ "px": [64,160], "src": [0,0], "f": 0, "t": 0, "d": [42] },
 						{ "px": [224,160], "src": [0,0], "f": 0, "t": 0, "d": [47] },
 						{ "px": [0,192], "src": [0,0], "f": 0, "t": 0, "d": [48] },
 						{ "px": [224,192], "src": [0,0], "f": 0, "t": 0, "d": [55] },
