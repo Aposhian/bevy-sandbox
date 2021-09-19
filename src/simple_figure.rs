@@ -236,7 +236,7 @@ fn spawn(
             },
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle {
-                shape: ColliderShape::cuboid(0.5, 0.5),
+                shape: ColliderShape::cuboid(0.18, 0.40),
                 ..Default::default()
             },
             move_action: MoveAction::default()

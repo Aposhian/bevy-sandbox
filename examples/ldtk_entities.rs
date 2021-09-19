@@ -66,8 +66,8 @@ fn spawn_entities(
                                             Some((
                                                 Isometry2::new(
                                                     [
-                                                        (x * layer.grid_size) as f32 / 32.0,
-                                                        (-y * layer.grid_size) as f32 / 32.0
+                                                        ((x * layer.grid_size) as f32 / 32.0) + 0.5,
+                                                        ((-y * layer.grid_size) as f32 / 32.0) - 0.5
                                                     ].into(),
                                                     0.0
                                                 ),
