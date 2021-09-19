@@ -55,30 +55,38 @@ fn spawn_entities(
                                         }
                                     })
                             });
-                        layer_instances.iter()
+                        let shapes = layer_instances.iter()
                             .filter(|layer| {
                                 layer.layer_instance_type == "IntGrid"
                             })
-                            .for_each(|layer| {
-                                for y in 0..layer.c_hei {
-                                    for x in 0..layer.c_wid {
-                                        match layer.int_grid_csv[(y * layer.c_hei + x) as usize] {
-                                            2 => {
-                                                commands.spawn()
-                                                .insert_bundle(ColliderBundle {
-                                                    shape: ColliderShape::cuboid(0.5, 0.5),
-                                                    position: Isometry2::new(
-                                                        [(x * layer.grid_size) as f32 / 32.0, (-y * layer.grid_size) as f32 / 32.0].into(),
-                                                        0.0
-                                                    ).into(),
-                                                    ..Default::default()
-                                                });
-                                            },
-                                            _ => {}
+                            .flat_map(|layer| {
+                                (0..layer.c_hei).flat_map(move |y| {
+                                    (0..layer.c_wid).map(move |x| {
+                                        if layer.int_grid_csv[(y * layer.c_hei + x) as usize] == 2 {
+                                            Some((
+                                                Isometry2::new(
+                                                    [
+                                                        (x * layer.grid_size) as f32 / 32.0,
+                                                        (-y * layer.grid_size) as f32 / 32.0
+                                                    ].into(),
+                                                    0.0
+                                                ),
+                                                ColliderShape::cuboid(0.5, 0.5)
+                                            ))
+                                        } else {
+                                            None
                                         }
-                                    }
-                                }
-                            });
+                                    })
+                                })
+                            })
+                            .filter_map(|shape| shape)
+                            .collect();
+
+                        commands.spawn_bundle(ColliderBundle {
+                            shape: ColliderShape::compound(shapes),
+                            ..Default::default()
+                        })
+                        .insert(ColliderDebugRender::with_id(2));
                     }
                 }
             }
@@ -98,6 +106,7 @@ fn main() {
         .add_plugins(SandboxPlugins)
         .add_plugin(TilemapPlugin)
         .add_plugin(LdtkPlugin)
+        .add_plugin(RapierRenderPlugin)
         .add_startup_system(load_assets.system())
         .add_system(spawn_entities.system())
         .run();

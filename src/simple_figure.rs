@@ -216,7 +216,6 @@ fn spawn(
     mut spawn_events: EventReader<SimpleFigureSpawnEvent>
 ) {
     for spawn_event in spawn_events.iter() {
-        info!("{:?}", spawn_event);
         let mut entity_commands = commands.spawn_bundle(SimpleFigureBundle {
             tag: SimpleFigureTag,
             sprite_sheet_bundle: SpriteSheetBundle {
