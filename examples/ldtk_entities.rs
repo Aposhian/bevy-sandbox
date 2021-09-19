@@ -24,28 +24,8 @@ fn load_assets(
         });
 }
 
-fn add_colliders(
-    mut commands: Commands,
-    tile_query: Query<(Entity, &Tile, &Transform), Added<Tile>>,
-) {
-    for (entity, tile, _transform) in tile_query.iter() {
-        if tile.texture_index == 0 {
-            commands.entity(entity)
-                .insert_bundle(ColliderBundle {
-                    shape: ColliderShape::cuboid(0.5, 0.5),
-                    // position: Isometry2::new(
-                    //     // [transform.translation.x / 32.0, transform.translation.y / 32.0].into(),
-                    //     [0.0, 0.0].into(),
-                    //     0.0
-                    // ).into(),
-                    ..Default::default()
-                })
-                .insert(ColliderPositionSync::Discrete);
-        }
-    }
-}
-
 fn spawn_entities(
+    mut commands: Commands,
     mut map_events: EventReader<AssetEvent<LdtkMap>>,
     mut spawn_writer: EventWriter<SimpleFigureSpawnEvent>,
     maps: Res<Assets<LdtkMap>>,
@@ -75,6 +55,30 @@ fn spawn_entities(
                                         }
                                     })
                             });
+                        layer_instances.iter()
+                            .filter(|layer| {
+                                layer.layer_instance_type == "IntGrid"
+                            })
+                            .for_each(|layer| {
+                                for y in 0..layer.c_hei {
+                                    for x in 0..layer.c_wid {
+                                        match layer.int_grid_csv[(y * layer.c_hei + x) as usize] {
+                                            2 => {
+                                                commands.spawn()
+                                                .insert_bundle(ColliderBundle {
+                                                    shape: ColliderShape::cuboid(0.5, 0.5),
+                                                    position: Isometry2::new(
+                                                        [(x * layer.grid_size) as f32 / 32.0, (-y * layer.grid_size) as f32 / 32.0].into(),
+                                                        0.0
+                                                    ).into(),
+                                                    ..Default::default()
+                                                });
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            });
                     }
                 }
             }
@@ -96,6 +100,5 @@ fn main() {
         .add_plugin(LdtkPlugin)
         .add_startup_system(load_assets.system())
         .add_system(spawn_entities.system())
-        .add_system(add_colliders.system())
         .run();
 }
