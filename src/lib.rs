@@ -7,10 +7,12 @@ use bevy::prelude::*;
 pub mod simple_figure;
 mod input;
 pub mod obstacle;
+mod camera;
 
 use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;
 use obstacle::ObstaclePlugin;
+use camera::CameraPlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -18,10 +20,10 @@ impl PluginGroup for SandboxPlugins {
         group.add(AnimationPlugin);
         group.add(RapierPhysicsPlugin::<NoUserData>::default());
         group.add(DefaultResources);
-        group.add(DefaultSystems);
         group.add(InputPlugin);
         group.add(SimpleFigurePlugin);
         group.add(ObstaclePlugin);
+        group.add(CameraPlugin);
     }
 }
 
@@ -36,16 +38,4 @@ impl Plugin for DefaultResources {
             )))
             .insert_resource(Msaa::default());
     }
-}
-
-pub struct DefaultSystems;
-
-impl Plugin for DefaultSystems {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system());
-    }
-}
-
-fn setup(mut commands: Commands) {
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 }

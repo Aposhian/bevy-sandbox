@@ -7,6 +7,7 @@ use std::f32::consts::FRAC_PI_4;
 use ldtk_rust::EntityInstance;
 
 use crate::input::{PlayerTag, MoveAction};
+use crate::camera::CameraTarget;
 
 pub struct SimpleFigurePlugin;
 
@@ -131,6 +132,7 @@ fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
     configuration.scale = 32.0;
 }
 
+#[derive(Default)]
 pub struct SimpleFigureTag;
 
 #[derive(Bundle)]
@@ -146,6 +148,24 @@ pub struct SimpleFigureBundle {
     #[bundle]
     collider_bundle: ColliderBundle,
     move_action: MoveAction
+}
+
+impl Default for SimpleFigureBundle {
+    fn default() -> Self {
+        SimpleFigureBundle {
+            tag: Default::default(),
+            sprite_sheet_bundle: SpriteSheetBundle::default(),
+            animation: Default::default(),
+            play: Default::default(),
+            rigid_body_bundle: Default::default(),
+            position_sync: RigidBodyPositionSync::Discrete,
+            collider_bundle: ColliderBundle {
+                shape: ColliderShape::cuboid(0.18, 0.40),
+                ..Default::default()
+            },
+            move_action: Default::default()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -217,14 +237,12 @@ fn spawn(
 ) {
     for spawn_event in spawn_events.iter() {
         let mut entity_commands = commands.spawn_bundle(SimpleFigureBundle {
-            tag: SimpleFigureTag,
             sprite_sheet_bundle: SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.handle.clone(),
                 transform: Transform::from_scale(Vec3::splat(spawn_event.scale)) * Transform::from_translation(Vec3::new(0.0, 0.0, spawn_event.z)),
                 ..Default::default()
             },
             animation: animations.front_stationary.clone(),
-            play: Play,
             rigid_body_bundle: RigidBodyBundle {
                 mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
                 forces: RigidBodyForces {
@@ -234,15 +252,11 @@ fn spawn(
                 position: spawn_event.position.into(),
                 ..Default::default()
             },
-            position_sync: RigidBodyPositionSync::Discrete,
-            collider_bundle: ColliderBundle {
-                shape: ColliderShape::cuboid(0.18, 0.40),
-                ..Default::default()
-            },
-            move_action: MoveAction::default()
+            ..Default::default()
         });
         if spawn_event.playable {
-            entity_commands.insert(PlayerTag);
+            entity_commands.insert(PlayerTag)
+                .insert(CameraTarget);
         }
     }
 }
