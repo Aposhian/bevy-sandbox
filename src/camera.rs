@@ -16,6 +16,9 @@ fn setup(mut commands: Commands) {
 
 pub struct CameraTarget;
 
+const X_DEAD_ZONE: f32 = 32.0;
+const Y_DEAD_ZONE: f32 = 32.0;
+
 fn camera_follow(
     mut q: QuerySet<(
         Query<(&CameraTarget, &Transform)>,
@@ -30,8 +33,14 @@ fn camera_follow(
 
     if let Some((_current_camera, mut camera_transform)) = q.q1_mut().iter_mut().next() {
         if let Some(translation) = translation {
-            camera_transform.translation.x = translation.x;
-            camera_transform.translation.y = translation.y;
+            let x_diff = translation.x - camera_transform.translation.x;
+            let y_diff = translation.y -  camera_transform.translation.y;
+            if x_diff.abs() > X_DEAD_ZONE {
+                camera_transform.translation.x = translation.x - x_diff.signum() * X_DEAD_ZONE;
+            }
+            if y_diff.abs() > Y_DEAD_ZONE {
+                camera_transform.translation.y = translation.y - y_diff.signum() * X_DEAD_ZONE;
+            }
         }
     }
 }

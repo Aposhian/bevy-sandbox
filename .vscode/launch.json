@@ -207,6 +207,24 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'ldtk_entities'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=ldtk_entities",
+                    "--package=bevy_sandbox"
+                ],
+                "filter": {
+                    "name": "ldtk_entities",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }
