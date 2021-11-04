@@ -56,11 +56,21 @@ fn spawn(
                     gravity_scale: 0.0,
                     ..Default::default()
                 },
+                velocity: RigidBodyVelocity {
+                    linvel: [2.0, 0.0].into(),
+                    ..Default::default()
+                },
                 position: spawn_event.position.into(),
                 ..Default::default()
             },
             collider_bundle: ColliderBundle {
-                shape: ColliderShape::ball(0.2),
+                shape: ColliderShape::ball(0.1),
+                mass_properties: ColliderMassProps::Density(0.001),
+                material: ColliderMaterial {
+                    restitution: 1.0,
+                    restitution_combine_rule: CoefficientCombineRule::Average,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
