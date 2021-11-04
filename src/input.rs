@@ -4,6 +4,8 @@ use bevy::{
     prelude::*,
 };
 use bevy_rapier2d::prelude::*;
+use crate::ball::BallSpawnEvent;
+use nalgebra::Isometry2;
 
 pub struct InputPlugin;
 
@@ -25,9 +27,10 @@ pub struct PlayerTag;
 
 fn keyboard(
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<(&PlayerTag, &mut MoveAction)>
+    mut query: Query<(&PlayerTag, &mut MoveAction, &RigidBodyPosition)>,
+    mut spawn_event: EventWriter<BallSpawnEvent>
     ) {
-    for (_tag, mut move_action) in query.iter_mut() {
+    for (_tag, mut move_action, RigidBodyPosition { position, .. }) in query.iter_mut() {
         let mut desired_velocity = Vec2::splat(0.0);
 
         if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
@@ -51,6 +54,16 @@ fn keyboard(
         } else {
             desired_velocity
         };
+
+        if keyboard_input.just_pressed(KeyCode::Space) {
+            spawn_event.send(BallSpawnEvent {
+                position: Isometry2::new(
+                    [position.translation.x + 1.0, position.translation.y].into(),
+                    0.0
+                ),
+                ..Default::default()
+            });
+        }
     }
 }
 

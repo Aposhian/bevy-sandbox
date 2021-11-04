@@ -8,11 +8,13 @@ pub mod simple_figure;
 mod input;
 pub mod obstacle;
 mod camera;
+mod ball;
 
 use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;
 use obstacle::ObstaclePlugin;
 use camera::CameraPlugin;
+use ball::BallPlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -24,6 +26,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(SimpleFigurePlugin);
         group.add(ObstaclePlugin);
         group.add(CameraPlugin);
+        group.add(BallPlugin);
     }
 }
 
