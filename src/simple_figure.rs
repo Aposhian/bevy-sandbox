@@ -1,5 +1,7 @@
+use std::error::Error;
 use std::time::Duration;
 
+use bevy::ecs::system::Command;
 use bevy::prelude::*;
 use bevy_rapier2d::{na::Isometry2, prelude::*};
 use benimator::{Play, SpriteSheetAnimation};
@@ -21,6 +23,7 @@ impl Plugin for SimpleFigurePlugin {
             .add_startup_system(setup_physics.system())
             .add_system(animation_control.system())
             .add_system(ball_collisions.system())
+            .add_system(health_despawner.system())
             .add_system(spawn.system());
     }
 }
@@ -137,6 +140,20 @@ fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
 #[derive(Default)]
 pub struct SimpleFigureTag;
 
+pub struct Health {
+    max: i32,
+    current: i32
+}
+
+impl Health {
+    fn from_max(max: i32) -> Self {
+        Health {
+            max,
+            current: max
+        }
+    }
+}
+
 #[derive(Bundle)]
 pub struct SimpleFigureBundle {
     tag: SimpleFigureTag,
@@ -149,7 +166,8 @@ pub struct SimpleFigureBundle {
     position_sync: RigidBodyPositionSync,
     #[bundle]
     collider_bundle: ColliderBundle,
-    move_action: MoveAction
+    move_action: MoveAction,
+    health: Health
 }
 
 impl Default for SimpleFigureBundle {
@@ -166,7 +184,8 @@ impl Default for SimpleFigureBundle {
                 flags: ActiveEvents::CONTACT_EVENTS.into(),
                 ..Default::default()
             },
-            move_action: Default::default()
+            move_action: Default::default(),
+            health: Health::from_max(10)
         }
     }
 }
@@ -284,13 +303,29 @@ fn animation_control(
 
 fn ball_collisions(
     ball_query: Query<(), With<BallTag>>,
+    mut figure_query: Query<&mut Health, With<SimpleFigureTag>>,
     mut contact_events: EventReader<ContactEvent>,
 ) {
     for contact_event in contact_events.iter() {
         if let ContactEvent::Started(c1, c2) = contact_event {
             if [c1, c2].iter().any(|&handle| ball_query.get(handle.entity()).is_ok()) {
-                info!("ball collision!");
+                for handle in [c1, c2] {
+                    if let Ok(mut health) = figure_query.get_mut(handle.entity()) {
+                        health.current -= 1;
+                    }
+                }
             }
+        }
+    }
+}
+
+fn health_despawner(
+    mut commands: Commands,
+    q: Query<(Entity, &Health), Changed<Health>>
+) {
+    for (entity, health) in q.iter() {
+        if health.current <= 0 {
+            commands.entity(entity).despawn();
         }
     }
 }
