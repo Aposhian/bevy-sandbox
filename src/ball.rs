@@ -12,8 +12,12 @@ impl Plugin for BallPlugin {
     }
 }
 
+
+pub struct BallTag;
+
 #[derive(Bundle)]
 pub struct BallBundle {
+    tag: BallTag,
     #[bundle]
     rigid_body_bundle: RigidBodyBundle,
     position_sync: RigidBodyPositionSync,
@@ -24,6 +28,7 @@ pub struct BallBundle {
 impl Default for BallBundle {
     fn default() -> Self {
         BallBundle {
+            tag: BallTag,
             rigid_body_bundle: Default::default(),
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle::default()

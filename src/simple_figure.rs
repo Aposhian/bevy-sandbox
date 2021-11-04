@@ -8,6 +8,7 @@ use ldtk_rust::EntityInstance;
 
 use crate::input::{PlayerTag, MoveAction};
 use crate::camera::CameraTarget;
+use crate::ball::BallTag;
 
 pub struct SimpleFigurePlugin;
 
@@ -19,6 +20,7 @@ impl Plugin for SimpleFigurePlugin {
             .add_event::<SimpleFigureSpawnEvent>()
             .add_startup_system(setup_physics.system())
             .add_system(animation_control.system())
+            .add_system(ball_collisions.system())
             .add_system(spawn.system());
     }
 }
@@ -161,6 +163,7 @@ impl Default for SimpleFigureBundle {
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::cuboid(0.18, 0.40),
+                flags: ActiveEvents::CONTACT_EVENTS.into(),
                 ..Default::default()
             },
             move_action: Default::default()
@@ -275,6 +278,19 @@ fn animation_control(
             sprite.flip_x = true;
         } else if velocity.linvel.x > 0.0 {
             sprite.flip_x = false;
+        }
+    }
+}
+
+fn ball_collisions(
+    ball_query: Query<(), With<BallTag>>,
+    mut contact_events: EventReader<ContactEvent>,
+) {
+    for contact_event in contact_events.iter() {
+        if let ContactEvent::Started(c1, c2) = contact_event {
+            if [c1, c2].iter().any(|&handle| ball_query.get(handle.entity()).is_ok()) {
+                info!("ball collision!");
+            }
         }
     }
 }
