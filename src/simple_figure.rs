@@ -1,7 +1,5 @@
-use std::error::Error;
 use std::time::Duration;
 
-use bevy::ecs::system::Command;
 use bevy::prelude::*;
 use bevy_rapier2d::{na::Isometry2, prelude::*};
 use benimator::{Play, SpriteSheetAnimation};
@@ -185,7 +183,7 @@ impl Default for SimpleFigureBundle {
                 ..Default::default()
             },
             move_action: Default::default(),
-            health: Health::from_max(10)
+            health: Health::from_max(5)
         }
     }
 }
@@ -321,7 +319,7 @@ fn ball_collisions(
 
 fn health_despawner(
     mut commands: Commands,
-    q: Query<(Entity, &Health), Changed<Health>>
+    q: Query<(Entity, &Health), (Changed<Health>, Without<PlayerTag>)>
 ) {
     for (entity, health) in q.iter() {
         if health.current <= 0 {
