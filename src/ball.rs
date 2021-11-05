@@ -56,13 +56,15 @@ impl Default for BallBundle {
 }
 
 pub struct BallSpawnEvent {
-    pub position: Isometry2<f32>
+    pub position: Isometry2<f32>,
+    pub velocity: Vec2
 }
 
 impl Default for BallSpawnEvent {
     fn default() -> Self {
         BallSpawnEvent {
-            position: Isometry2::identity()
+            position: Isometry2::identity(),
+            velocity: Vec2::ZERO
         }
     }
 }
@@ -81,7 +83,7 @@ fn spawn(
                     ..Default::default()
                 },
                 velocity: RigidBodyVelocity {
-                    linvel: [10.0, 0.0].into(),
+                    linvel: spawn_event.velocity.into(),
                     ..Default::default()
                 },
                 position: spawn_event.position.into(),
