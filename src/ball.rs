@@ -50,7 +50,7 @@ impl Default for BallBundle {
                 },
                 ..Default::default()
             },
-            health: Health::from_max(1)
+            health: Health::from_max(1000)
         }
     }
 }

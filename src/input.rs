@@ -71,7 +71,7 @@ fn mouse_aim(
     for player_tf in query.iter() {
         if let Some(window) = windows.get_primary() {
             if let Some(cursor_pos) = window.cursor_position() {
-                if buttons.just_pressed(MouseButton::Left) {
+                if buttons.pressed(MouseButton::Left) {
                     let size = Vec2::new(window.width() as f32, window.height() as f32);
 
 
