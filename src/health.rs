@@ -47,12 +47,10 @@ fn damage(
 ) {
     for contact_event in contact_events.iter() {
         if let ContactEvent::Started(c1, c2) = contact_event {
-            for damager in [c1, c2] {
-                for damageable in [c1, c2] {
-                    if let Ok(CollisionDamage { damage }) = damager_query.get(damager.entity()) {
-                        if let Ok(mut health) = health_query.get_mut(damageable.entity()) {
-                            health.current -= damage;
-                        }
+            for (damager, damageable) in [(c1, c2), (c2, c1)] {
+                if let Ok(CollisionDamage { damage }) = damager_query.get(damager.entity()) {
+                    if let Ok(mut health) = health_query.get_mut(damageable.entity()) {
+                        health.current -= damage;
                     }
                 }
             }

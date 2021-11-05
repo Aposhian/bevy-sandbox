@@ -58,7 +58,7 @@ fn keyboard(
         if keyboard_input.just_pressed(KeyCode::Space) {
             spawn_event.send(BallSpawnEvent {
                 position: Isometry2::new(
-                    [position.translation.x + 1.0, position.translation.y].into(),
+                    [position.translation.x + 0.7, position.translation.y].into(),
                     0.0
                 ),
                 ..Default::default()

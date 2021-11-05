@@ -3,6 +3,7 @@ use bevy_rapier2d::prelude::*;
 use nalgebra::Isometry2;
 
 use crate::health::CollisionDamage;
+use crate::health::Health;
 
 pub struct BallPlugin;
 
@@ -26,18 +27,30 @@ pub struct BallBundle {
     position_sync: RigidBodyPositionSync,
     #[bundle]
     collider_bundle: ColliderBundle,
+    health: Health
 }
 
 impl Default for BallBundle {
     fn default() -> Self {
         BallBundle {
             tag: BallTag,
+            rigid_body_bundle: Default::default(),
             collision_damage: CollisionDamage {
                 damage: 1
             },
-            rigid_body_bundle: Default::default(),
             position_sync: RigidBodyPositionSync::Discrete,
-            collider_bundle: ColliderBundle::default()
+            collider_bundle: ColliderBundle {
+                shape: ColliderShape::ball(0.1),
+                flags: ActiveEvents::CONTACT_EVENTS.into(),
+                mass_properties: ColliderMassProps::Density(0.001),
+                material: ColliderMaterial {
+                    restitution: 1.0,
+                    restitution_combine_rule: CoefficientCombineRule::Average,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            health: Health::from_max(1)
         }
     }
 }
@@ -68,20 +81,10 @@ fn spawn(
                     ..Default::default()
                 },
                 velocity: RigidBodyVelocity {
-                    linvel: [2.0, 0.0].into(),
+                    linvel: [10.0, 0.0].into(),
                     ..Default::default()
                 },
                 position: spawn_event.position.into(),
-                ..Default::default()
-            },
-            collider_bundle: ColliderBundle {
-                shape: ColliderShape::ball(0.1),
-                mass_properties: ColliderMassProps::Density(0.001),
-                material: ColliderMaterial {
-                    restitution: 1.0,
-                    restitution_combine_rule: CoefficientCombineRule::Average,
-                    ..Default::default()
-                },
                 ..Default::default()
             },
             ..Default::default()
