@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use nalgebra::Isometry2;
 
+use crate::health::CollisionDamage;
+
 pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
@@ -18,6 +20,7 @@ pub struct BallTag;
 #[derive(Bundle)]
 pub struct BallBundle {
     tag: BallTag,
+    collision_damage: CollisionDamage,
     #[bundle]
     rigid_body_bundle: RigidBodyBundle,
     position_sync: RigidBodyPositionSync,
@@ -29,6 +32,9 @@ impl Default for BallBundle {
     fn default() -> Self {
         BallBundle {
             tag: BallTag,
+            collision_damage: CollisionDamage {
+                damage: 1
+            },
             rigid_body_bundle: Default::default(),
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle::default()
