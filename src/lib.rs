@@ -10,6 +10,7 @@ pub mod obstacle;
 mod camera;
 mod ball;
 mod health;
+mod ai;
 
 use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;

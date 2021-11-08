@@ -66,7 +66,7 @@ fn mouse_aim(
     rapier_config: Res<RapierConfiguration>,
     query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<&Transform, With<Camera>>,
-    mut spawn_event: EventWriter<BallSpawnEvent>
+    mut spawn_event: EventWriter<GoalPositionEvent>
 ) {
     for player_tf in query.iter() {
         if let Some(window) = windows.get_primary() {
