@@ -1,4 +1,5 @@
 use benimator::AnimationPlugin;
+use bevy_prototype_lyon::plugin::ShapePlugin;
 use bevy_rapier2d::prelude::*;
 use bevy::render::pass::ClearColor;
 use bevy::app::PluginGroupBuilder;
@@ -10,8 +11,9 @@ pub mod obstacle;
 mod camera;
 mod ball;
 mod health;
-mod ai;
+mod pathfinding;
 
+use crate::pathfinding::PathfindingPlugin;
 use simple_figure::SimpleFigurePlugin;
 use input::InputPlugin;
 use obstacle::ObstaclePlugin;
@@ -31,6 +33,8 @@ impl PluginGroup for SandboxPlugins {
         group.add(CameraPlugin);
         group.add(BallPlugin);
         group.add(HealthPlugin);
+        group.add(PathfindingPlugin);
+        group.add(ShapePlugin);
     }
 }
 

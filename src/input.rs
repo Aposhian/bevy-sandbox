@@ -7,6 +7,7 @@ use bevy::render::camera::Camera;
 use bevy_rapier2d::prelude::*;
 use crate::ball::BallSpawnEvent;
 use nalgebra::Isometry2;
+use crate::pathfinding::GoalPosition;
 
 pub struct InputPlugin;
 
@@ -61,19 +62,19 @@ fn keyboard(
 
 
 fn mouse_aim(
+    mut commands: Commands,
     buttons: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     rapier_config: Res<RapierConfiguration>,
-    query: Query<&GlobalTransform, With<PlayerTag>>,
+    player_query: Query<(Entity, &GlobalTransform), With<PlayerTag>>,
     camera_query: Query<&Transform, With<Camera>>,
-    mut spawn_event: EventWriter<GoalPositionEvent>
+    mut ball_spawn_event: EventWriter<BallSpawnEvent>
 ) {
-    for player_tf in query.iter() {
+    for (entity, player_tf) in player_query.iter() {
         if let Some(window) = windows.get_primary() {
             if let Some(cursor_pos) = window.cursor_position() {
                 if buttons.just_pressed(MouseButton::Left) {
                     let size = Vec2::new(window.width() as f32, window.height() as f32);
-
 
                     // https://bevy-cheatbook.github.io/cookbook/cursor2world.html
                     // the default orthographic projection is in pixels from the center;
@@ -90,7 +91,7 @@ fn mouse_aim(
                     let cursor_real_pos = cursor_world_pos / rapier_config.scale;
                     let direction = (cursor_real_pos - player_pos).normalize_or_zero();
 
-                    spawn_event.send(BallSpawnEvent {
+                    ball_spawn_event.send(BallSpawnEvent {
                         position: Isometry2::new(
                             (player_pos + direction * 1.0).into(),
                             0.0
@@ -98,6 +99,9 @@ fn mouse_aim(
                         velocity: direction * 10.0,
                         ..Default::default()
                     });
+                    info!("inserting goal position");
+                    commands.entity(entity)
+                        .insert(GoalPosition::default());
                 }
             }
         }
