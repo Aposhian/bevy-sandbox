@@ -91,20 +91,23 @@ fn mouse_aim(
                     let cursor_real_pos = cursor_world_pos / rapier_config.scale;
                     let direction = (cursor_real_pos - player_pos).normalize_or_zero();
 
-                    let position = Isometry2::new(
-                        (player_pos + direction * 1.0).into(),
-                        0.0
-                    );
+                    info!("goal_position: {:?}", cursor_real_pos);
 
                     ball_spawn_event.send(BallSpawnEvent {
-                        position: position.clone(),
+                        position: Isometry2::new(
+                            (player_pos + direction * 1.0).into(),
+                            0.0
+                        ),
                         velocity: direction * 10.0,
                         ..Default::default()
                     });
 
                     commands.entity(entity)
                         .insert(GoalPosition {
-                            position: position
+                            position: Isometry2::new(
+                                cursor_real_pos.into(),
+                                0.0
+                            )
                         });
                 }
             }
