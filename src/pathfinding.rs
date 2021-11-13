@@ -17,7 +17,7 @@ impl Plugin for PathfindingPlugin {
 }
 
 pub struct GoalPosition {
-    position: Isometry2<f32>
+    pub position: Isometry2<f32>
 }
 
 impl Default for GoalPosition {
@@ -37,7 +37,8 @@ const MAX_TOI: f32 = 4.0;
 
 fn compute_path_to_goal(
     mut commands: Commands,
-    query: Query<(Entity, &GoalPosition), Added<GoalPosition>>,
+    rapier_config: Res<RapierConfiguration>,
+    query: Query<(Entity, &GoalPosition), Or<(Added<GoalPosition>, Changed<GoalPosition>)>>,
     query_pipeline: Res<QueryPipeline>,
     collider_query: QueryPipelineColliderComponentsQuery
 ) {
@@ -66,25 +67,22 @@ fn compute_path_to_goal(
         //     }
         // }
 
-        let path = commands.spawn()
-            .insert(Path {
-                points: vec![
-                        Vec2::new(0.0, 100.0),
-                        Vec2::new(100.0, 100.0),
-                        Vec2::new(200.0, 200.0)
-                    ]
-            }).id();
         info!("Inserting path");
         commands.entity(entity)
-            .push_children(&vec![path]);
+            .insert(Path {
+                points: vec![
+                        Vec2::ZERO,
+                        rapier_config.scale * Vec2::from(goal.translation)
+                    ]
+            });
     }
 }
 
 fn draw_paths(
     mut commands: Commands,
-    query: Query<&Path, Added<Path>>
+    query: Query<(Entity, &Path), Or<(Added<Path>, Changed<Path>)>>
 ) {
-    for path in query.iter() {
+    for (entity, path) in query.iter() {
         info!("Draw path");
         let mut builder = GeometryBuilder::new();
 
@@ -95,13 +93,15 @@ fn draw_paths(
             }
         }
 
-        commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-        commands.spawn_bundle(builder
+        let geometry_entity = commands.spawn_bundle(builder
             .build(
-                ShapeColors::new(Color::BLACK),
-                DrawMode::Stroke(StrokeOptions::default().with_line_width(10.0)),
+                ShapeColors::new(Color::RED),
+                DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
                 Transform::default()
             )
-        );
+        ).id();
+
+        commands.entity(entity)
+            .push_children(&vec![geometry_entity]);
     }
 }
