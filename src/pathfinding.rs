@@ -34,9 +34,9 @@ pub struct Path {
 
 pub struct PathVisualization(Entity);
 
-const MAX_TOI: f32 = 1.0;
+const MAX_TOI: f32 = 10.0;
 
-const THETA_STEPS: u8 = 8;
+const THETA_STEPS: u8 = 16;
 
 const GRID_SCALE: u8 = 10;
 
@@ -60,7 +60,7 @@ impl From<Vec2> for GridPoint {
 
 impl Into<Vec2> for GridPoint {
     fn into(self) -> Vec2 {
-        Vec2::new((self.0 / GRID_SCALE as i32) as f32, (self.1 / GRID_SCALE as i32) as f32)
+        Vec2::new(self.0 as f32 / GRID_SCALE as f32, self.1 as f32 / GRID_SCALE as f32)
     }
 }
 
@@ -116,7 +116,6 @@ fn compute_path_to_goal(
         );
 
         if let Some((path, _)) = result {
-            info!("inserting path");
             commands.entity(entity)
                 .insert(Path {
                     points: path.iter().map(|&point| { point.into() }).collect()
