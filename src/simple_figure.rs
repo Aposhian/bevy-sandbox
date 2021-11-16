@@ -163,6 +163,7 @@ impl Default for SimpleFigureBundle {
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::cuboid(0.18, 0.40),
                 flags: ActiveEvents::CONTACT_EVENTS.into(),
+                
                 ..Default::default()
             },
             move_action: Default::default()

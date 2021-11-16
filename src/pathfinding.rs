@@ -44,7 +44,7 @@ fn compute_path_to_goal(
     ) in query.iter() {
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
     
-        let direction: Vec2 = goal.translation.into();
+        let direction: Vec2 = (Vec2::from(goal.translation) - Vec2::from(position.translation)).normalize_or_zero();
 
         if let Some((_, toi)) = query_pipeline.cast_shape(
             &collider_set,
@@ -53,14 +53,16 @@ fn compute_path_to_goal(
             &**shape,
             MAX_TOI,
             InteractionGroups::all(),
-            None
+            Some(&|handle| {
+                handle != entity.handle()
+            })
         ) {
-            info!("inserting path: toi={}", toi.toi);
+            info!("inserting path: toi={}, status={:?}", toi.toi, toi.status);
             commands.entity(entity)
                 .insert(Path {
                     points: vec![
                             position.translation.into(),
-                            goal.translation.into()
+                            direction * toi.toi + Vec2::from(position.translation)
                         ]
                 });
         }
