@@ -35,7 +35,7 @@ pub struct Path {
 
 pub struct PathVisualization(Entity);
 
-const MAX_TOI: f32 = 3.0;
+const MAX_TOI: f32 = 0.5;
 
 const THETA_STEPS: u8 = 8;
 
