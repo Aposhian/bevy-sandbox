@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_rapier2d::na::Isometry2;
 use bevy_prototype_lyon::prelude::*;
-use pathfinding::prelude::fringe;
+use pathfinding::prelude::astar;
 use std::f32::consts::TAU;
 use bevy::math::Mat2;
 use std::ops::Add;
@@ -104,7 +104,7 @@ fn compute_path_to_goal(
         info!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
-        let result = fringe(
+        let result = astar(
             &start_grid,
             |position| {
                 let query_pipeline = &query_pipeline;
