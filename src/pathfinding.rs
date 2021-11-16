@@ -30,7 +30,7 @@ impl Default for GoalPosition {
     }
 }
 pub struct Path {
-    points: Vec<Vec2>
+    pub points: Vec<Vec2>
 }
 
 pub struct PathVisualization(Entity);
