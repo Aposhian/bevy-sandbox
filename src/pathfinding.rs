@@ -2,6 +2,10 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_rapier2d::na::Isometry2;
 use bevy_prototype_lyon::prelude::*;
+use pathfinding::prelude::astar;
+use std::f32::consts::TAU;
+use bevy::math::Mat2;
+use std::ops::Add;
 
 pub struct PathfindingPlugin;
 
@@ -30,6 +34,34 @@ pub struct Path {
 
 const MAX_TOI: f32 = 100.0;
 
+const TOI_SCALE: i32 = 100;
+
+const THETA_STEPS: u8 = 8;
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+struct GridPoint(i32, i32);
+
+impl Add for GridPoint {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0, self.1 + other.1)
+    }
+}
+
+impl From<Vec2> for GridPoint {
+    fn from(value: Vec2) -> Self {
+        let rounded = value.round();
+        GridPoint(rounded.x as i32, rounded.y as i32)
+    }
+}
+
+impl Into<Vec2> for GridPoint {
+    fn into(self) -> Vec2 {
+        Vec2::new(self.0 as f32, self.1 as f32)
+    }
+}
+
 fn compute_path_to_goal(
     mut commands: Commands,
     query: Query<(Entity, &RigidBodyPosition, &ColliderShape, &GoalPosition), Or<(Added<GoalPosition>, Changed<GoalPosition>)>>,
@@ -38,33 +70,55 @@ fn compute_path_to_goal(
 ) {
     for (
         entity,
-        RigidBodyPosition { position, .. },
+        RigidBodyPosition { position: start, .. },
         shape,
         GoalPosition { position: goal }
     ) in query.iter() {
+        let start_grid = GridPoint::from(Vec2::from(start.translation));
+        let goal_grid = GridPoint::from(Vec2::from(goal.translation));
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
-    
-        let direction: Vec2 = (Vec2::from(goal.translation) - Vec2::from(position.translation)).normalize_or_zero();
 
-        if let Some((_, toi)) = query_pipeline.cast_shape(
-            &collider_set,
-            &position,
-            &direction.into(),
-            &**shape,
-            MAX_TOI,
-            InteractionGroups::new(0b0100, 0b0100),
-            Some(&|handle| {
-                handle != entity.handle()
-            })
-        ) {
-            info!("inserting path: toi={}, status={:?}", toi.toi, toi.status);
+        let result = astar(
+            &start_grid,
+            |position| {
+                let query_pipeline = &query_pipeline;
+                let collider_set = &collider_set;
+                (0..THETA_STEPS).map(move |theta_step| {
+                        let theta: f32 =  theta_step as f32 * (TAU / THETA_STEPS as f32);
+                        let vec_position: Vec2 = position.clone().into();
+                        let direction: Vec2 = Mat2::from_angle(theta) * vec_position;
+                        let direction = direction.normalize_or_zero();
+
+                        // unwrap since we are setting max_toi
+                        let (_, toi) = query_pipeline.cast_shape(
+                            collider_set,
+                            &start.translation.into(),
+                            &direction.into(),
+                            &**shape,
+                            MAX_TOI,
+                            InteractionGroups::new(0b0100, 0b0100),
+                            Some(&|handle| {
+                                handle != entity.handle()
+                            })
+                        ).unwrap();
+                        (position.clone() + GridPoint::from(toi.toi * direction), (toi.toi * TOI_SCALE as f32) as i32)
+                    }).collect::<Vec<(GridPoint, i32)>>().into_iter()
+            },
+            |position| {
+                TOI_SCALE * ((position.0 - goal_grid.0).pow(2) + (position.1 - goal_grid.1).pow(2))
+            },
+            |position| *position == goal_grid
+        );
+
+        if let Some((path, _)) = result {
+            info!("inserting path");
+
             commands.entity(entity)
                 .insert(Path {
-                    points: vec![
-                            position.translation.into(),
-                            direction * toi.toi + Vec2::from(position.translation)
-                        ]
+                    points: path.iter().map(|&point| { point.into() }).collect()
                 });
+        } else {
+            warn!("no path found");
         }
     }
 }
