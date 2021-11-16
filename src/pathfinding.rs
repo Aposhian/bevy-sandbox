@@ -35,11 +35,11 @@ pub struct Path {
 
 pub struct PathVisualization(Entity);
 
-const MAX_TOI: f32 = 0.5;
+const MAX_TOI: f32 = 0.1;
 
-const THETA_STEPS: u8 = 8;
+const THETA_STEPS: u8 = 4;
 
-const GRID_SCALE: u8 = 5;
+const GRID_SCALE: u8 = 10;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 struct GridPoint(i32, i32);
@@ -113,7 +113,7 @@ fn compute_path_to_goal(
                         let position = position.clone();
                         let theta: f32 =  theta_step as f32 * (TAU / THETA_STEPS as f32);
                         let vec_position: Vec2 = position.into();
-                        let direction: Vec2 = Mat2::from_angle(theta) * vec_position;
+                        let direction: Vec2 = Mat2::from_angle(theta) * Vec2::X;
                         let direction = direction.normalize_or_zero();
 
                         let toi = match query_pipeline.cast_shape(
