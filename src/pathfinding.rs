@@ -110,14 +110,15 @@ fn compute_path_to_goal(
                 let query_pipeline = &query_pipeline;
                 let collider_set = &collider_set;
                 (0..THETA_STEPS).map(move |theta_step| {
+                        let position = position.clone();
                         let theta: f32 =  theta_step as f32 * (TAU / THETA_STEPS as f32);
-                        let vec_position: Vec2 = position.clone().into();
+                        let vec_position: Vec2 = position.into();
                         let direction: Vec2 = Mat2::from_angle(theta) * vec_position;
                         let direction = direction.normalize_or_zero();
 
                         let toi = match query_pipeline.cast_shape(
                             collider_set,
-                            &start.translation.into(),
+                            &vec_position.into(),
                             &direction.into(),
                             &**shape,
                             MAX_TOI,
@@ -130,7 +131,7 @@ fn compute_path_to_goal(
                             None => MAX_TOI
                         };
                         let next = GridPoint::from(toi * direction);
-                        (position.clone() + next, position.distance(next))
+                        (position + next, position.distance(next))
                     })
                     .filter(|(next, _)| *next != *position) // not sure if this is necessary
                     .collect::<Vec<(GridPoint, i32)>>().into_iter()
