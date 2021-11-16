@@ -36,7 +36,7 @@ pub struct PathVisualization(Entity);
 
 const MAX_TOI: f32 = 10.0;
 
-const THETA_STEPS: u8 = 16;
+const THETA_STEPS: u8 = 8;
 
 const GRID_SCALE: u8 = 10;
 
@@ -106,7 +106,8 @@ fn compute_path_to_goal(
                             Some((_, toi)) => toi.toi,
                             None => MAX_TOI
                         };
-                        (position.clone() + GridPoint::from(toi * direction), toi as i32)
+                        info!("toi: {}", toi);
+                        (position.clone() + GridPoint::from(toi * direction), GRID_SCALE as i32 * toi as i32)
                     }).collect::<Vec<(GridPoint, i32)>>().into_iter()
             },
             |position| {
