@@ -84,6 +84,10 @@ fn spawn_entities(
 
                         commands.spawn_bundle(ColliderBundle {
                             shape: ColliderShape::compound(shapes),
+                            flags: ColliderFlags {
+                                collision_groups: InteractionGroups::new(0b0110, 0b0110),
+                                ..Default::default()
+                            },
                             ..Default::default()
                         })
                         .insert(ColliderDebugRender::with_id(2));

@@ -162,8 +162,11 @@ impl Default for SimpleFigureBundle {
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::cuboid(0.18, 0.40),
-                flags: ActiveEvents::CONTACT_EVENTS.into(),
-                
+                flags: ColliderFlags {
+                    collision_groups: InteractionGroups::new(0b0111, 0b0111),
+                    active_events: ActiveEvents::CONTACT_EVENTS,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             move_action: Default::default()

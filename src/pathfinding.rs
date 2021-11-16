@@ -52,7 +52,7 @@ fn compute_path_to_goal(
             &direction.into(),
             &**shape,
             MAX_TOI,
-            InteractionGroups::all(),
+            InteractionGroups::new(0b0100, 0b0100),
             Some(&|handle| {
                 handle != entity.handle()
             })

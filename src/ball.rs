@@ -41,7 +41,11 @@ impl Default for BallBundle {
             position_sync: RigidBodyPositionSync::Discrete,
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::ball(0.1),
-                flags: ActiveEvents::CONTACT_EVENTS.into(),
+                flags: ColliderFlags {
+                    collision_groups: InteractionGroups::new(0b0011, 0b0011),
+                    active_events: ActiveEvents::CONTACT_EVENTS,
+                    ..Default::default()
+                },
                 mass_properties: ColliderMassProps::Density(0.001),
                 material: ColliderMaterial {
                     restitution: 1.0,
