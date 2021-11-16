@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_rapier2d::na::Isometry2;
 use bevy_prototype_lyon::prelude::*;
-use pathfinding::prelude::astar;
+use pathfinding::prelude::fringe;
 use std::f32::consts::TAU;
 use bevy::math::Mat2;
 use std::ops::Add;
@@ -35,11 +35,11 @@ pub struct Path {
 
 pub struct PathVisualization(Entity);
 
-const MAX_TOI: f32 = 10.0;
+const MAX_TOI: f32 = 3.0;
 
 const THETA_STEPS: u8 = 8;
 
-const GRID_SCALE: u8 = 10;
+const GRID_SCALE: u8 = 5;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 struct GridPoint(i32, i32);
@@ -104,7 +104,7 @@ fn compute_path_to_goal(
         info!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
-        let result = astar(
+        let result = fringe(
             &start_grid,
             |position| {
                 let query_pipeline = &query_pipeline;
@@ -131,7 +131,9 @@ fn compute_path_to_goal(
                         };
                         let next = GridPoint::from(toi * direction);
                         (position.clone() + next, position.distance(next))
-                    }).collect::<Vec<(GridPoint, i32)>>().into_iter()
+                    })
+                    .filter(|(next, _)| *next != *position) // not sure if this is necessary
+                    .collect::<Vec<(GridPoint, i32)>>().into_iter()
             },
             |position| {
                 position.distance(goal_grid)
