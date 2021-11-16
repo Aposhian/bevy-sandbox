@@ -6,6 +6,7 @@ use pathfinding::prelude::astar;
 use std::f32::consts::TAU;
 use bevy::math::Mat2;
 use std::ops::Add;
+use std::ops::Sub;
 
 pub struct PathfindingPlugin;
 
@@ -43,11 +44,33 @@ const GRID_SCALE: u8 = 10;
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 struct GridPoint(i32, i32);
 
+impl GridPoint {
+    fn norm(self) -> i32 {
+        (self.squared_norm() as f32).sqrt() as i32
+    }
+
+    fn squared_norm(self) -> i32 {
+        self.0.pow(2) + self.1.pow(2)
+    }
+
+    fn distance(self, other: Self) -> i32 {
+        (self - other).norm()
+    }
+}
+
 impl Add for GridPoint {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0, self.1 + other.1)
+    }
+}
+
+impl Sub for GridPoint {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0, self.1 - other.1)
     }
 }
 
@@ -106,12 +129,12 @@ fn compute_path_to_goal(
                             Some((_, toi)) => toi.toi,
                             None => MAX_TOI
                         };
-                        info!("toi: {}", toi);
-                        (position.clone() + GridPoint::from(toi * direction), GRID_SCALE as i32 * toi as i32)
+                        let next = GridPoint::from(toi * direction);
+                        (position.clone() + next, position.distance(next))
                     }).collect::<Vec<(GridPoint, i32)>>().into_iter()
             },
             |position| {
-                (position.0 - goal_grid.0).pow(2) + (position.1 - goal_grid.1).pow(2)
+                position.distance(goal_grid)
             },
             |position| *position == goal_grid
         );
