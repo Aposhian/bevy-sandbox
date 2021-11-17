@@ -8,7 +8,7 @@ pub struct PathfollowingPlugin;
 impl Plugin for PathfollowingPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
-            .add_system(create_carrot.system())
+            .add_system(reset_carrot.system())
             .add_system(go_to_carrot.system())
             .add_system(goal_checker.system());
     }
@@ -26,12 +26,12 @@ impl Default for Carrot {
     }
 }
 
-fn create_carrot(
+fn reset_carrot(
     mut commands: Commands,
-    q: Query<Entity, Added<Path>>
+    q: Query<Entity, Or<(Added<Path>, Changed<Path>)>>
 ) {
     for entity in q.iter() {
-        info!("Inserting carrot");
+        info!("Inserting or resetting carrot");
         commands.entity(entity).insert(Carrot::default());
     }
 }
@@ -65,7 +65,8 @@ fn goal_checker(
         if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
             info!("Reached carrot!");
             carrot.index += 1;
-            if carrot.index > path.points.len() {
+            if carrot.index >= path.points.len() {
+                info!("Removing Carrot and Path");
                 commands.entity(entity)
                     .remove::<Path>()
                     .remove::<Carrot>();
