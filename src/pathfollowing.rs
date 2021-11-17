@@ -56,9 +56,9 @@ const GOAL_TOLERANCE: f32 = 0.1;
 
 fn goal_checker(
     mut commands: Commands,
-    mut q: Query<(Entity, &mut Carrot, &RigidBodyPosition, &Path)>
+    mut q: Query<(Entity, &mut Carrot, &mut RigidBodyVelocity, &RigidBodyPosition, &Path)>
 ) {
-    for (entity , mut carrot, pos, path) in q.iter_mut() {
+    for (entity , mut carrot, mut vel, pos, path) in q.iter_mut() {
         let carrot_position = path.points[carrot.index];
         let current_position: Vec2 = pos.position.translation.into();
 
@@ -67,6 +67,7 @@ fn goal_checker(
             carrot.index += 1;
             if carrot.index >= path.points.len() {
                 info!("Removing Carrot and Path");
+                vel.linvel = Vec2::ZERO.into();
                 commands.entity(entity)
                     .remove::<Path>()
                     .remove::<Carrot>();
