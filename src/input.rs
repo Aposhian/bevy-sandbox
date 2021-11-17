@@ -14,8 +14,8 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system(keyboard.system())
-            .add_system(mouse_aim.system())
-            .add_system(movement.system());
+            .add_system(mouse_aim.system());
+            // .add_system(movement.system());
     }
 }
 
