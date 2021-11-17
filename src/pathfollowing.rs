@@ -40,15 +40,14 @@ fn go_to_carrot(
     mut q: Query<(&mut RigidBodyVelocity, &RigidBodyPosition, &Carrot, &Path), Or<(Added<Carrot>, Changed<Carrot>)>>
 ) {
     for (mut vel, pos, carrot, path) in q.iter_mut() {
-        let carrot_position = path.points[carrot.index];
-        let current_position: Vec2 = pos.position.translation.into();
+        if let Some(&carrot_position) = path.points.get(carrot.index) {
+            let current_position: Vec2 = pos.position.translation.into();
 
-        let delta = carrot_position - current_position;
+            let delta = carrot_position - current_position;
 
-        // info!("Applying force");
-        // forces.apply_force_at_point(&RigidBodyMassProps::default(), delta.into(), current_position.into());
-        info!("Setting velocity");
-        vel.linvel = delta.into();
+            info!("Setting velocity");
+            vel.linvel = delta.into();
+        }
     }
 }
 
@@ -59,18 +58,18 @@ fn goal_checker(
     mut q: Query<(Entity, &mut Carrot, &mut RigidBodyVelocity, &RigidBodyPosition, &Path)>
 ) {
     for (entity , mut carrot, mut vel, pos, path) in q.iter_mut() {
-        let carrot_position = path.points[carrot.index];
-        let current_position: Vec2 = pos.position.translation.into();
-
-        if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
-            info!("Reached carrot!");
-            carrot.index += 1;
-            if carrot.index >= path.points.len() {
-                info!("Removing Carrot and Path");
-                vel.linvel = Vec2::ZERO.into();
-                commands.entity(entity)
-                    .remove::<Path>()
-                    .remove::<Carrot>();
+        if let Some(carrot_position) = path.points.get(carrot.index) {
+            let current_position: Vec2 = pos.position.translation.into();
+            if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
+                info!("Reached carrot!");
+                carrot.index += 1;
+                if carrot.index >= path.points.len() {
+                    info!("Removing Carrot and Path");
+                    vel.linvel = Vec2::ZERO.into();
+                    commands.entity(entity)
+                        .remove::<Path>()
+                        .remove::<Carrot>();
+                }
             }
         }
     }
