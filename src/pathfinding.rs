@@ -8,6 +8,8 @@ use bevy::math::Mat2;
 use std::ops::Add;
 use std::ops::Sub;
 
+use crate::input::PlayerTag;
+
 pub struct PathfindingPlugin;
 
 impl Plugin for PathfindingPlugin {
@@ -91,10 +93,14 @@ const INFLATION_LAYER : f32 = 0.2; // m
 
 fn compute_path_to_goal(
     mut commands: Commands,
+    player: Query<Entity, With<PlayerTag>>,
     query: Query<(Entity, &RigidBodyPosition, &ColliderShape, &GoalPosition), Or<(Added<GoalPosition>, Changed<GoalPosition>)>>,
     query_pipeline: Res<QueryPipeline>,
     collider_query: QueryPipelineColliderComponentsQuery
 ) {
+
+    let player_entity = player.iter().next();
+
     for (
         entity,
         RigidBodyPosition { position: start, .. },
@@ -136,7 +142,10 @@ fn compute_path_to_goal(
                             MAX_TOI,
                             InteractionGroups::new(0b0100, 0b0100),
                             Some(&|handle| {
-                                handle != entity.handle()
+                                handle != entity.handle() && match player_entity {
+                                    Some(player) => handle != player.handle(),
+                                    None => true
+                                }
                             })
                         ) {
                             Some((_, toi)) => toi.toi,
