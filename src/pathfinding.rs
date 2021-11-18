@@ -87,7 +87,7 @@ impl Into<Vec2> for GridPoint {
     }
 }
 
-const INFLATION_LAYER : f32 = 0.1; // m
+const INFLATION_LAYER : f32 = 0.2; // m
 
 fn compute_path_to_goal(
     mut commands: Commands,
