@@ -87,6 +87,8 @@ impl Into<Vec2> for GridPoint {
     }
 }
 
+const INFLATION_LAYER : f32 = 0.1; // m
+
 fn compute_path_to_goal(
     mut commands: Commands,
     query: Query<(Entity, &RigidBodyPosition, &ColliderShape, &GoalPosition), Or<(Added<GoalPosition>, Changed<GoalPosition>)>>,
@@ -116,11 +118,21 @@ fn compute_path_to_goal(
                         let direction: Vec2 = Mat2::from_angle(theta) * Vec2::X;
                         let direction = direction.normalize_or_zero();
 
+                        let inflated_shape = match shape.shape_type() {
+                            ShapeType::Cuboid => {
+                                let cuboid = shape.as_cuboid().unwrap();
+                                ColliderShape::cuboid(cuboid.half_extents[0] + INFLATION_LAYER, cuboid.half_extents[1] + INFLATION_LAYER)
+                            },
+                            _ => {
+                                ColliderShape::cuboid(INFLATION_LAYER, INFLATION_LAYER)
+                            }
+                        };
+
                         let toi = match query_pipeline.cast_shape(
                             collider_set,
                             &vec_position.into(),
                             &direction.into(),
-                            &**shape,
+                            &*inflated_shape,
                             MAX_TOI,
                             InteractionGroups::new(0b0100, 0b0100),
                             Some(&|handle| {
