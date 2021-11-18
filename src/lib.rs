@@ -13,6 +13,7 @@ mod ball;
 mod health;
 mod pathfinding;
 mod pathfollowing;
+mod ai;
 
 use crate::pathfinding::PathfindingPlugin;
 use simple_figure::SimpleFigurePlugin;
@@ -22,6 +23,7 @@ use camera::CameraPlugin;
 use ball::BallPlugin;
 use health::HealthPlugin;
 use pathfollowing::PathfollowingPlugin;
+use ai::AiPlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -38,6 +40,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(PathfindingPlugin);
         group.add(ShapePlugin);
         group.add(PathfollowingPlugin);
+        group.add(AiPlugin);
     }
 }
 
