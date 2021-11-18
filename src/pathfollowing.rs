@@ -46,8 +46,6 @@ fn go_to_carrot(
             let current_position: Vec2 = pos.position.translation.into();
 
             let delta = carrot_position - current_position;
-
-            info!("Setting velocity");
             vel.linvel = (VELOCITY_SCALE * delta).into();
         }
     }
@@ -63,7 +61,6 @@ fn goal_checker(
         if let Some(carrot_position) = path.points.get(carrot.index) {
             let current_position: Vec2 = pos.position.translation.into();
             if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
-                info!("Reached carrot!");
                 carrot.index += 1;
                 if carrot.index >= path.points.len() {
                     info!("Removing Carrot and Path");

@@ -7,15 +7,14 @@ use bevy::render::camera::Camera;
 use bevy_rapier2d::prelude::*;
 use crate::ball::BallSpawnEvent;
 use nalgebra::Isometry2;
-use crate::pathfinding::GoalPosition;
 
 pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system(keyboard.system())
-            .add_system(mouse_aim.system());
-            // .add_system(movement.system());
+            .add_system(mouse_aim.system())
+            .add_system(movement.system());
     }
 }
 
@@ -62,15 +61,14 @@ fn keyboard(
 
 
 fn mouse_aim(
-    mut commands: Commands,
     buttons: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     rapier_config: Res<RapierConfiguration>,
-    player_query: Query<(Entity, &GlobalTransform), With<PlayerTag>>,
+    player_query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<&Transform, With<Camera>>,
     mut ball_spawn_event: EventWriter<BallSpawnEvent>
 ) {
-    for (entity, player_tf) in player_query.iter() {
+    for player_tf in player_query.iter() {
         if let Some(window) = windows.get_primary() {
             if let Some(cursor_pos) = window.cursor_position() {
                 if buttons.just_pressed(MouseButton::Left) {
@@ -101,14 +99,6 @@ fn mouse_aim(
                         velocity: direction * 10.0,
                         ..Default::default()
                     });
-
-                    commands.entity(entity)
-                        .insert(GoalPosition {
-                            position: Isometry2::new(
-                                cursor_real_pos.into(),
-                                0.0
-                            )
-                        });
                 }
             }
         }
