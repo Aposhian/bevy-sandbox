@@ -36,6 +36,8 @@ fn reset_carrot(
     }
 }
 
+const VELOCITY_SCALE: f32 = 2.0;
+
 fn go_to_carrot(
     mut q: Query<(&mut RigidBodyVelocity, &RigidBodyPosition, &Carrot, &Path), Or<(Added<Carrot>, Changed<Carrot>)>>
 ) {
@@ -46,7 +48,7 @@ fn go_to_carrot(
             let delta = carrot_position - current_position;
 
             info!("Setting velocity");
-            vel.linvel = delta.into();
+            vel.linvel = (VELOCITY_SCALE * delta).into();
         }
     }
 }
