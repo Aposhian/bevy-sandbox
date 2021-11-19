@@ -37,7 +37,7 @@ fn reset_carrot(
     }
 }
 
-const VELOCITY_SCALE: f32 = 0.2;
+const VELOCITY_SCALE: f32 = 0.5;
 
 fn go_to_carrot(
     mut q: Query<(&mut MoveAction, &RigidBodyPosition, &Carrot, &Path), Or<(Added<Carrot>, Changed<Carrot>)>>
