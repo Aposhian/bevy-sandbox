@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 use crate::pathfinding::Path;
+use crate::input::MoveAction;
 
 pub struct PathfollowingPlugin;
 
@@ -36,17 +37,17 @@ fn reset_carrot(
     }
 }
 
-const VELOCITY_SCALE: f32 = 2.0;
+const VELOCITY_SCALE: f32 = 0.2;
 
 fn go_to_carrot(
-    mut q: Query<(&mut RigidBodyVelocity, &RigidBodyPosition, &Carrot, &Path), Or<(Added<Carrot>, Changed<Carrot>)>>
+    mut q: Query<(&mut MoveAction, &RigidBodyPosition, &Carrot, &Path), Or<(Added<Carrot>, Changed<Carrot>)>>
 ) {
-    for (mut vel, pos, carrot, path) in q.iter_mut() {
+    for (mut move_action, pos, carrot, path) in q.iter_mut() {
         if let Some(&carrot_position) = path.points.get(carrot.index) {
             let current_position: Vec2 = pos.position.translation.into();
 
-            let delta = carrot_position - current_position;
-            vel.linvel = (VELOCITY_SCALE * delta).into();
+            let delta = (carrot_position - current_position).normalize_or_zero();
+            move_action.desired_velocity = (VELOCITY_SCALE * delta).into();
         }
     }
 }
@@ -62,6 +63,7 @@ fn goal_checker(
             let current_position: Vec2 = pos.position.translation.into();
             if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
                 carrot.index += 1;
+                info!("Reached carrot {}", carrot.index);
                 if carrot.index >= path.points.len() {
                     info!("Removing Carrot and Path");
                     vel.linvel = Vec2::ZERO.into();

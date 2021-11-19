@@ -20,7 +20,7 @@ struct ReplanTimer(Timer);
 fn setup(
     mut commands: Commands
 ) {
-    commands.insert_resource(ReplanTimer(Timer::from_seconds(1.0, true)));
+    commands.insert_resource(ReplanTimer(Timer::from_seconds(0.5, true)));
 }
 
 fn zombie_follow(
@@ -33,6 +33,7 @@ fn zombie_follow(
     timer.0.tick(time.delta());
     if timer.0.finished() {
         if let Some(player_position) = player.iter().next() {
+            info!("Replanning zombie goal");
             for entity in zombies.iter() {
                 commands.entity(entity)
                     .insert(GoalPosition {
