@@ -7,6 +7,7 @@ use std::f32::consts::TAU;
 use bevy::math::Mat2;
 use std::ops::Add;
 use std::ops::Sub;
+use pathfinding::grid::Grid;
 
 use crate::ecs::BondedEntities;
 use crate::ecs::DespawnEvent;
@@ -14,9 +15,15 @@ use crate::input::PlayerTag;
 
 pub struct PathfindingPlugin;
 
+
 impl Plugin for PathfindingPlugin {
     fn build(&self, app: &mut AppBuilder) {
+        let mut grid = Grid::new(100, 100);
+        grid.add_borders();
+        grid.add_vertex((50, 50));
         app
+            .insert_resource(grid)
+            .add_startup_system(draw_grid.system())
             .add_system(compute_path_to_goal.system())
             .add_system(draw_paths.system());
     }
@@ -171,6 +178,24 @@ fn compute_path_to_goal(
         } else {
             warn!("no path found");
         }
+    }
+}
+
+fn draw_grid(
+    mut commands: Commands,
+    rc: Res<RapierConfiguration>,
+    grid: Res<Grid>
+) {
+    for (x, y) in grid.iter() {
+        commands.spawn_bundle(GeometryBuilder::build_as(
+            &shapes::Circle {
+                radius: 1.0,
+                center: Vec2::ZERO,
+            },
+            ShapeColors::new(Color::BLUE),
+            DrawMode::Fill(FillOptions::default()),
+            Transform::from_translation(Vec3::new(rc.scale * x as f32, rc.scale * y as f32, 10.0))
+        ));
     }
 }
 
