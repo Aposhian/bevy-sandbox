@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
+
+use crate::ecs::DespawnEvent;
+
 pub struct HealthPlugin;
 
 impl Plugin for HealthPlugin {
@@ -29,12 +32,12 @@ pub struct CollisionDamage {
 }
 
 fn health_despawner(
-    mut commands: Commands,
-    q: Query<(Entity, &Health), Changed<Health>>
+    q: Query<(Entity, &Health), Changed<Health>>,
+    mut despawn: EventWriter<DespawnEvent>
 ) {
     for (entity, health) in q.iter() {
         if health.current <= 0 {
-            commands.entity(entity).despawn();
+            despawn.send(DespawnEvent(entity));
         }
     }
 }

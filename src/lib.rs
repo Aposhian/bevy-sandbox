@@ -14,6 +14,7 @@ mod health;
 mod pathfinding;
 mod pathfollowing;
 mod ai;
+mod ecs;
 
 use crate::pathfinding::PathfindingPlugin;
 use simple_figure::SimpleFigurePlugin;
@@ -24,6 +25,7 @@ use ball::BallPlugin;
 use health::HealthPlugin;
 use pathfollowing::PathfollowingPlugin;
 use ai::AiPlugin;
+use ecs::DespawnPlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -41,6 +43,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(ShapePlugin);
         group.add(PathfollowingPlugin);
         group.add(AiPlugin);
+        group.add(DespawnPlugin);
     }
 }
 

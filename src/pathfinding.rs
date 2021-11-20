@@ -8,6 +8,8 @@ use bevy::math::Mat2;
 use std::ops::Add;
 use std::ops::Sub;
 
+use crate::ecs::BondedEntities;
+use crate::ecs::DespawnEvent;
 use crate::input::PlayerTag;
 
 pub struct PathfindingPlugin;
@@ -34,8 +36,6 @@ impl Default for GoalPosition {
 pub struct Path {
     pub points: Vec<Vec2>
 }
-
-pub struct PathVisualization(Entity);
 
 const MAX_TOI: f32 = 0.1;
 
@@ -177,10 +177,10 @@ fn compute_path_to_goal(
 fn draw_paths(
     mut commands: Commands,
     rc: Res<RapierConfiguration>,
-    query: Query<(Entity, &Path), Or<(Added<Path>, Changed<Path>)>>,
-    viz_query: Query<(Entity, &PathVisualization)>
+    mut path_query: Query<(Entity, &Path, Option<&mut BondedEntities>), Or<(Added<Path>, Changed<Path>)>>,
+    mut despawn: EventWriter<DespawnEvent>
 ) {
-    for (entity, path) in query.iter() {
+    for (path_entity, path, bonded_entities) in path_query.iter_mut() {
         info!("Draw path");
         let mut builder = GeometryBuilder::new();
 
@@ -196,13 +196,17 @@ fn draw_paths(
                 DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
                 Transform::from_translation(Vec3::new(0.0, 0.0, 10.0))
             )
-        ).id();
+        )
+        .id();
 
-        if let Ok((_,PathVisualization(entity))) = viz_query.get(entity) {
-            commands.entity(*entity).despawn();
+        if let Some(mut bonded_entities) = bonded_entities {
+            for entity in bonded_entities.iter() {
+                despawn.send(DespawnEvent(*entity));
+            }
+            bonded_entities.clear();
+            bonded_entities.push(line_entity);
+        } else {
+            commands.entity(path_entity).insert(BondedEntities(vec![line_entity]));
         }
-
-        commands.entity(entity)
-            .insert(PathVisualization(line_entity));
     }
 }
