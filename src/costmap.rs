@@ -11,13 +11,13 @@ impl Plugin for CostmapPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
             .add_startup_system(setup.system())
-            .add_system(update.system());
+            .add_system(update.system())
+            .add_system(draw_grid.system());
     }
 }
+
 const COSTMAP_SIZE: usize = 10;
 const COSTMAP_RESOLUTION: f32 = 10.0;
-const UNOCCUPIED_COST: Cost = 0;
-const OCCUPIED_COST: Cost = 1;
 
 pub type SharedCostmap = Costmap<COSTMAP_SIZE,COSTMAP_SIZE>;
 
@@ -28,7 +28,7 @@ fn setup(
     commands.insert_resource(SharedCostmap::new(
         Mat3::from_scale_angle_translation(
             Vec2::splat(COSTMAP_RESOLUTION),
-            0.0,
+            std::f32::consts::FRAC_PI_2,
             Vec2::ZERO)
     ));
 }
@@ -38,30 +38,37 @@ fn update(
     q: Query<(&InteractionGroups, &RigidBodyPosition, &ColliderShape)>
 ) {
     for (ig, rb_pos, shape) in q.iter() {
-        costmap.set_cost(UNOCCUPIED_COST, ig, shape, &rb_pos.position);
-        costmap.set_cost(OCCUPIED_COST, ig, shape, &rb_pos.position);
+        costmap.set_cost(Cost::UNOCCUPIED, ig, shape, &rb_pos.position);
+        costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
     }
 }
 
 fn draw_grid(
     mut commands: Commands,
     rc: Res<RapierConfiguration>,
-    grid: Res<SharedCostmap>
+    costmap: Res<SharedCostmap>
 ) {
-    for (x, y) in grid.ititerer() {
+    for (pos, CostmapCell { cost , .. }) in costmap.iter() {
         commands.spawn_bundle(GeometryBuilder::build_as(
             &shapes::Circle {
                 radius: 1.0,
                 center: Vec2::ZERO,
             },
-            ShapeColors::new(Color::BLUE),
+            ShapeColors::new(match cost {
+                Cost::UNOCCUPIED => Color::BLUE,
+                Cost::OCCUPIED => Color::RED
+            }),
             DrawMode::Fill(FillOptions::default()),
-            Transform::from_translation(Vec3::new(rc.scale * x as f32, rc.scale * y as f32, 10.0))
+            Transform::from_translation(Vec3::new(rc.scale * pos.x, rc.scale * pos.y, 10.0))
         ));
     }
 }
 
-pub type Cost = u8;
+#[derive(Clone, Copy, Debug)]
+pub enum Cost {
+    UNOCCUPIED,
+    OCCUPIED
+}
 
 #[derive(Clone, Copy)]
 pub struct CostmapCell {
@@ -72,7 +79,7 @@ pub struct CostmapCell {
 impl Default for CostmapCell {
     fn default() -> Self {
         CostmapCell {
-            cost: 0,
+            cost: Cost::UNOCCUPIED,
             interaction_groups: InteractionGroups::all()
         }
     }
@@ -82,25 +89,13 @@ pub struct Costmap<const M: usize, const N: usize> {
     data: [[CostmapCell; N]; M]
 }
 
-pub struct CostmapIterator<const M: usize, const N: usize> {
-    costmap: Costmap<M,N>,
+pub struct CostmapIterator<'a, const M: usize, const N: usize> {
+    costmap: &'a Costmap<M,N>,
     index: usize
 }
 
-impl<const M: usize, const N: usize> IntoIterator for Costmap<M,N> {
-    type Item = CostmapCell;
-    type IntoIter = CostmapIterator<M,N>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        CostmapIterator {
-            costmap: self,
-            index: 0
-        }
-    }
-}
-
-impl<const M: usize, const N: usize> Iterator for CostmapIterator<M,N> {
-    type Item = CostmapCell;
+impl<'a, const M: usize, const N: usize> Iterator for CostmapIterator<'a, M,N> {
+    type Item = (Vec2, CostmapCell);
 
     fn next(&mut self) -> Option<Self::Item> {
         let row = self.index / M;
@@ -111,7 +106,10 @@ impl<const M: usize, const N: usize> Iterator for CostmapIterator<M,N> {
         if row >= M || column >= N {
             None
         } else {
-            Some(self.costmap.data[row][column])
+            Some((
+                self.costmap.transform.inverse().transform_vector2(Vec2::new(row as f32, column as f32)),
+                self.costmap.data[row][column]
+            ))
         }
     }
 }
@@ -121,6 +119,13 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
         Costmap::<M,N> {
             transform,
             ..Default::default()
+        }
+    }
+
+    fn iter(&self) -> CostmapIterator<M,N> {
+        CostmapIterator {
+            costmap: &self,
+            index: 0
         }
     }
 

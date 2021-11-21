@@ -27,6 +27,8 @@ use health::HealthPlugin;
 use pathfollowing::PathfollowingPlugin;
 use ai::AiPlugin;
 use ecs::DespawnPlugin;
+use costmap::CostmapPlugin;
+
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -45,6 +47,7 @@ impl PluginGroup for SandboxPlugins {
         group.add(PathfollowingPlugin);
         group.add(AiPlugin);
         group.add(DespawnPlugin);
+        group.add(CostmapPlugin);
     }
 }
 
