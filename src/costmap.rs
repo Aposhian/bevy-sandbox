@@ -10,44 +10,30 @@ pub struct CostmapPlugin;
 impl Plugin for CostmapPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
-            .add_startup_system(setup.system())
+            .add_startup_system_to_stage(StartupStage::PreStartup, setup.system()) // For some reason it panicks if it runs later
             .add_system(update.system())
-            .add_system(draw_grid.system());
+            .add_system(update_grid_viz.system());
     }
 }
 
-const COSTMAP_SIZE: usize = 10;
-const COSTMAP_RESOLUTION: f32 = 10.0;
+const COSTMAP_SIZE: usize = 50;
+const COSTMAP_RESOLUTION: f32 = 10.0; // meters per costmap cell?
 
 pub type SharedCostmap = Costmap<COSTMAP_SIZE,COSTMAP_SIZE>;
 
+pub struct CostmapCellVisualizationTag;
+
 fn setup(
     mut commands: Commands,
+    rc: Res<RapierConfiguration>
 ) {
-
-    commands.insert_resource(SharedCostmap::new(
+    let costmap = SharedCostmap::new(
         Mat3::from_scale_angle_translation(
-            Vec2::splat(COSTMAP_RESOLUTION),
+            Vec2::splat(1.0 / COSTMAP_RESOLUTION),
             std::f32::consts::FRAC_PI_2,
             Vec2::ZERO)
-    ));
-}
+    );
 
-fn update(
-    mut costmap: ResMut<SharedCostmap>,
-    q: Query<(&InteractionGroups, &RigidBodyPosition, &ColliderShape)>
-) {
-    for (ig, rb_pos, shape) in q.iter() {
-        costmap.set_cost(Cost::UNOCCUPIED, ig, shape, &rb_pos.position);
-        costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
-    }
-}
-
-fn draw_grid(
-    mut commands: Commands,
-    rc: Res<RapierConfiguration>,
-    costmap: Res<SharedCostmap>
-) {
     for (pos, CostmapCell { cost , .. }) in costmap.iter() {
         commands.spawn_bundle(GeometryBuilder::build_as(
             &shapes::Circle {
@@ -60,7 +46,35 @@ fn draw_grid(
             }),
             DrawMode::Fill(FillOptions::default()),
             Transform::from_translation(Vec3::new(rc.scale * pos.x, rc.scale * pos.y, 10.0))
-        ));
+        ))
+        .insert(CostmapCellVisualizationTag);
+    }
+
+    commands.insert_resource(costmap);
+}
+
+
+fn update(
+    mut costmap: ResMut<SharedCostmap>,
+    q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>
+) {
+    for (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape) in q.iter() {
+        costmap.set_cost(Cost::UNOCCUPIED, ig, shape, &rb_pos.position);
+        costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.next_position);
+    }
+}
+
+fn update_grid_viz(
+    costmap: Res<SharedCostmap>,
+    rc: Res<RapierConfiguration>,
+    mut q: Query<(&Transform, &mut ShapeColors), With<CostmapCellVisualizationTag>>
+) {
+    for (transform, mut colors) in q.iter_mut() {
+        let cell = &costmap[Vec2::from(transform.translation) / rc.scale];
+        *colors = ShapeColors::new(match cell.cost {
+            Cost::UNOCCUPIED => Color::BLUE,
+            Cost::OCCUPIED => Color::RED
+        });
     }
 }
 
