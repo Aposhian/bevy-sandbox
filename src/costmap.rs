@@ -38,7 +38,7 @@ fn setup(
     for (pos, CostmapCell { cost , .. }) in costmap.iter() {
         commands.spawn_bundle(GeometryBuilder::build_as(
             &shapes::Circle {
-                radius: 1.0,
+                radius: 3.0,
                 center: Vec2::ZERO,
             },
             ShapeColors::new(match cost {
@@ -61,7 +61,8 @@ fn update(
     mut costmap: ResMut<SharedCostmap>,
     q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>
 ) {
-    for (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape) in q.iter() {
+    for (i, (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape)) in q.iter().enumerate() {
+        info!("setting cost for entity {}", i);
         costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
         costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.next_position);
     }
