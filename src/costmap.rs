@@ -62,7 +62,7 @@ fn update(
     q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>
 ) {
     for (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape) in q.iter() {
-        costmap.set_cost(Cost::UNOCCUPIED, ig, shape, &rb_pos.position);
+        costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
         costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.next_position);
     }
 }
@@ -180,8 +180,8 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
             let x_max = max.x as usize;
             let y_max = max.y as usize;
 
-            for x in x_min..x_max {
-                for y in y_min..y_max {
+            for x in x_min..=x_max {
+                for y in y_min..=y_max {
                     let cell = &mut self.data[x][y];
                     cell.interaction_groups = InteractionGroups::new(
                         cell.interaction_groups.memberships | interaction_groups.memberships,
