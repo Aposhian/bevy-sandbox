@@ -5,6 +5,7 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use bevy_prototype_lyon::prelude::*;
 
+
 pub struct CostmapPlugin;
 
 impl Plugin for CostmapPlugin {
@@ -51,6 +52,8 @@ fn setup(
     }
 
     commands.insert_resource(costmap);
+
+    commands.insert_resource(VisualizationUpdateTimer(Timer::from_seconds(1.0, true)));
 }
 
 
@@ -64,17 +67,32 @@ fn update(
     }
 }
 
+struct VisualizationUpdateTimer(Timer);
+
 fn update_grid_viz(
+    mut meshes: ResMut<Assets<Mesh>>,
+    time: Res<Time>,
+    mut timer: ResMut<VisualizationUpdateTimer>,
     costmap: Res<SharedCostmap>,
     rc: Res<RapierConfiguration>,
-    mut q: Query<(&Transform, &mut ShapeColors), With<CostmapCellVisualizationTag>>
+    mut q: Query<(&Transform, &Handle<Mesh>), With<CostmapCellVisualizationTag>>
 ) {
-    for (transform, mut colors) in q.iter_mut() {
-        let cell = &costmap[Vec2::from(transform.translation) / rc.scale];
-        *colors = ShapeColors::new(match cell.cost {
-            Cost::UNOCCUPIED => Color::BLUE,
-            Cost::OCCUPIED => Color::RED
-        });
+    timer.0.tick(time.delta());
+    if timer.0.finished() {
+        for (transform, mesh_handle) in q.iter_mut() {
+            if let Some(mesh) = meshes.get_mut(mesh_handle) {
+                let cell = &costmap[Vec2::from(transform.translation) / rc.scale];
+                let color_attribute = <[f32; 4]>::from(
+                    match cell.cost {
+                        Cost::UNOCCUPIED => Color::BLUE,
+                        Cost::OCCUPIED => Color::RED
+                    }
+                );
+                mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, vec![
+                    color_attribute.clone(); mesh.count_vertices()
+                ]);
+            }
+        }
     }
 }
 

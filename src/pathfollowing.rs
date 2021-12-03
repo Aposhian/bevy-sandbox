@@ -63,7 +63,6 @@ fn goal_checker(
             let current_position: Vec2 = pos.position.translation.into();
             if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
                 carrot.index += 1;
-                info!("Reached carrot {}", carrot.index);
                 if carrot.index >= path.points.len() {
                     info!("Removing Carrot and Path");
                     vel.linvel = Vec2::ZERO.into();
