@@ -18,7 +18,7 @@ impl Plugin for SimpleFigurePlugin {
             .init_resource::<SimpleFigureTextureAtlasHandle>()
             .init_resource::<SimpleFigureAnimationHandles>()
             .add_event::<SimpleFigureSpawnEvent>()
-            .add_startup_system(setup_physics.system())
+            .add_startup_system_to_stage(StartupStage::PreStartup, setup_physics.system())
             .add_system(animation_control.system())
             .add_system(spawn.system());
     }

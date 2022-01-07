@@ -8,7 +8,7 @@ pub struct CostmapPlugin;
 impl Plugin for CostmapPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
-            .add_startup_system_to_stage(StartupStage::PostStartup, setup.system())  // For some reason it panicks if it runs later
+            .add_startup_system_to_stage(StartupStage::PreStartup, setup.system())  // For some reason it panicks if it runs later
             .add_system_to_stage(CoreStage::PreUpdate, reset_costmap.system().label("reset_costmap"))
             .add_system_to_stage(CoreStage::PreUpdate, update.system().label("update_costmap").after("reset_costmap"))
             .add_system(update_grid_viz.system());
@@ -166,17 +166,18 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
             let x_max = max.x as usize;
             let y_max = max.y as usize;
 
-            for x in x_min..=x_max {
-                for y in y_min..=y_max {
-                    // cell.interaction_groups = InteractionGroups::new(
-                    //     cell.interaction_groups.memberships | interaction_groups.memberships,
-                    //     cell.interaction_groups.filter | interaction_groups.filter
-                    // );
-                    let (row, column) = self.to_row_column(Vec2::new(x as f32, y as f32));
+            // for x in x_min..=x_max {
+            //     for y in y_min..=y_max {
+            //         // cell.interaction_groups = InteractionGroups::new(
+            //         //     cell.interaction_groups.memberships | interaction_groups.memberships,
+            //         //     cell.interaction_groups.filter | interaction_groups.filter
+            //         // );
+            //         let (row, column) = self.to_row_column(Vec2::new(x as f32, y as f32));
+            //         self.data[row][column].cost = cost;
+            //     }
+            // }
+                    let (row, column) = self.to_row_column(pos.translation.into());
                     self.data[row][column].cost = cost;
-                }
-            }
-
         }
 }
 
