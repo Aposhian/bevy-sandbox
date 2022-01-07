@@ -14,8 +14,8 @@ impl Plugin for CostmapPlugin {
     }
 }
 
-const COSTMAP_SIZE: usize = 20; // number of cells in each dimension (this squared for total)
-const COSTMAP_RESOLUTION: f32 = 1.0; // meters per costmap cell
+const COSTMAP_SIZE: usize = 40; // number of cells in each dimension (this squared for total)
+const COSTMAP_RESOLUTION: f32 = 0.25; // meters per costmap cell
 
 const OCCUPIED_COLOR: Color = Color::rgba(1.0, 0.0, 0.0, 0.5);
 const UNOCCUPIED_COLOR: Color = Color::rgba(0.0, 0.0, 1.0, 0.5);
@@ -59,7 +59,7 @@ fn setup(
 
     commands.insert_resource(costmap);
 
-    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(1.0, true)));
+    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(5.0, true)));
 }
 
 fn reset_costmap(
@@ -159,11 +159,14 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
         pos: &Isometry2<f32>) -> Vec<(usize, usize)> {
             let aabb = shape.compute_aabb(pos);
 
-            let vec_min: Vec2 = aabb.mins.into();
-            let vec_max: Vec2 = aabb.maxs.into();
+            let corner1 = self.to_row_column(aabb.mins.into());
+            let corner2 = self.to_row_column(aabb.maxs.into());
 
-            let (min_row, min_column) = self.to_row_column(vec_min);
-            let (max_row, max_column) = self.to_row_column(vec_max);
+            let min_row = std::cmp::min(corner1.0, corner2.0);
+            let max_row = std::cmp::max(corner1.0, corner2.0);
+
+            let min_column = std::cmp::min(corner1.1, corner2.1);
+            let max_column = std::cmp::max(corner1.1, corner2.1);
 
             let costmap_cell_coordinates = Iterator::zip(min_row..=max_row, min_column..=max_column).collect::<Vec<(usize, usize)>>();
 
