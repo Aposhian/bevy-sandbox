@@ -59,7 +59,7 @@ fn setup(
 
     commands.insert_resource(costmap);
 
-    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(0.5, true)));
+    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(0.2, true)));
 }
 
 fn reset_costmap(
