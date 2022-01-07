@@ -59,7 +59,7 @@ fn setup(
 
     commands.insert_resource(costmap);
 
-    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(5.0, true)));
+    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(0.5, true)));
 }
 
 fn reset_costmap(
@@ -168,14 +168,19 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
             let min_column = std::cmp::min(corner1.1, corner2.1);
             let max_column = std::cmp::max(corner1.1, corner2.1);
 
-            let costmap_cell_coordinates = Iterator::zip(min_row..=max_row, min_column..=max_column).collect::<Vec<(usize, usize)>>();
 
-            for (row, column) in costmap_cell_coordinates.iter() {
+            let mut costmap_cell_coordinates = Vec::new();
+            costmap_cell_coordinates.reserve((max_row - min_row) * (max_column - min_column));
+
+            for row in min_row..=max_row {
+                for column in min_column..=max_column {
                     // cell.interaction_groups = InteractionGroups::new(
                     //     cell.interaction_groups.memberships | interaction_groups.memberships,
                     //     cell.interaction_groups.filter | interaction_groups.filter
                     // );
-                self.data[*row][*column].cost = cost;
+                    self.data[row][column].cost = cost;
+                    costmap_cell_coordinates.push((row,column));
+                }
             }
                     // let (row, column) = self.to_row_column(pos.translation.into());
                     // self.data[row][column].cost = cost;
