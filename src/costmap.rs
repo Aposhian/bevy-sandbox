@@ -8,14 +8,13 @@ pub struct CostmapPlugin;
 impl Plugin for CostmapPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app
-            .add_startup_system_to_stage(StartupStage::PreStartup, setup.system())  // For some reason it panicks if it runs later
+            .add_startup_system_to_stage(StartupStage::PreStartup, setup.system().after("setup_physics"))  // For some reason it panicks if it runs later
             .add_system_to_stage(CoreStage::PreUpdate, reset_costmap.system().label("reset_costmap"))
-            .add_system_to_stage(CoreStage::PreUpdate, update.system().label("update_costmap").after("reset_costmap"))
-            .add_system(update_grid_viz.system());
+            .add_system_to_stage(CoreStage::PreUpdate, update.system().label("update_costmap").after("reset_costmap"));
     }
 }
 
-const COSTMAP_SIZE: usize = 10; // number of cells in each dimension (this squared for total)
+const COSTMAP_SIZE: usize = 20; // number of cells in each dimension (this squared for total)
 const COSTMAP_RESOLUTION: f32 = 1.0; // meters per costmap cell
 
 const OCCUPIED_COLOR: Color = Color::rgba(1.0, 0.0, 0.0, 0.5);
@@ -23,7 +22,10 @@ const UNOCCUPIED_COLOR: Color = Color::rgba(0.0, 0.0, 1.0, 0.5);
 
 pub type SharedCostmap = Costmap<COSTMAP_SIZE,COSTMAP_SIZE>;
 
-pub struct CostmapCellCoordinates(usize, usize);
+pub struct CostmapCellCoordinates {
+    coordinates: (usize, usize)
+}
+
 
 fn setup(
     mut commands: Commands,
@@ -51,52 +53,30 @@ fn setup(
                 DrawMode::Fill(FillOptions::default()),
                 Transform::from_translation(Vec3::new(pixel_position.x, pixel_position.y, 10.0))
             ))
-            .insert(CostmapCellCoordinates(row, column));
+            .insert(CostmapCellCoordinates { coordinates: (row, column) });
         }
     }
 
     commands.insert_resource(costmap);
 
-    commands.insert_resource(VisualizationUpdateTimer(Timer::from_seconds(0.2, true)));
+    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(1.0, true)));
 }
 
 fn reset_costmap(
-    mut costmap: ResMut<SharedCostmap>
-) {
-    for mut element in costmap.data.iter_mut().flat_map(|r| r.iter_mut()) {
-        element.cost = Cost::UNOCCUPIED;
-    }
-}
-
-fn update(
-    mut costmap: ResMut<SharedCostmap>,
-    q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>
-) {
-    for (i, (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape)) in q.iter().enumerate() {
-        costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
-    }
-}
-
-struct VisualizationUpdateTimer(Timer);
-
-fn update_grid_viz(
     mut meshes: ResMut<Assets<Mesh>>,
+    mut costmap: ResMut<SharedCostmap>,
     time: Res<Time>,
-    mut timer: ResMut<VisualizationUpdateTimer>,
-    costmap: Res<SharedCostmap>,
-    mut q: Query<(&CostmapCellCoordinates, &Handle<Mesh>)>
+    mut timer: ResMut<CostmapResetTimer>,
+    mut viz_query: Query<(&CostmapCellCoordinates, &Handle<Mesh>)>
 ) {
     timer.0.tick(time.delta());
     if timer.0.finished() {
-        for (coordinates, mesh_handle) in q.iter_mut() {
+        for mut element in costmap.data.iter_mut().flat_map(|r| r.iter_mut()) {
+            element.cost = Cost::UNOCCUPIED;
+        }
+        for (_, mesh_handle) in viz_query.iter_mut() {
             if let Some(mesh) = meshes.get_mut(mesh_handle) {
-                let cell = &costmap.data[coordinates.0][coordinates.1];
-                let color_attribute = <[f32; 4]>::from(
-                    match cell.cost {
-                        Cost::UNOCCUPIED => UNOCCUPIED_COLOR,
-                        Cost::OCCUPIED => OCCUPIED_COLOR
-                    }
-                );
+                let color_attribute = <[f32; 4]>::from(UNOCCUPIED_COLOR);
                 mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, vec![
                     color_attribute.clone(); mesh.count_vertices()
                 ]);
@@ -104,6 +84,30 @@ fn update_grid_viz(
         }
     }
 }
+
+fn update(
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut costmap: ResMut<SharedCostmap>,
+    q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>,
+    mut viz_query: Query<(&CostmapCellCoordinates, &Handle<Mesh>)>
+) {
+    for (i, (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape)) in q.iter().enumerate() {
+        let occupied_cells = costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
+        for (CostmapCellCoordinates { coordinates }, mesh_handle) in viz_query.iter_mut() {
+            if occupied_cells.contains(coordinates) {
+                if let Some(mesh) = meshes.get_mut(mesh_handle) {
+                    let color_attribute = <[f32; 4]>::from(OCCUPIED_COLOR);
+                    mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, vec![
+                        color_attribute.clone(); mesh.count_vertices()
+                    ]);
+                }
+            }
+        }
+    }
+}
+
+struct CostmapResetTimer(Timer);
+
 
 #[derive(Clone, Copy, Debug)]
 pub enum Cost {
@@ -152,32 +156,27 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
         cost: Cost,
         interaction_groups: &InteractionGroups,
         shape: &SharedShape,
-        pos: &Isometry2<f32>) {
+        pos: &Isometry2<f32>) -> Vec<(usize, usize)> {
             let aabb = shape.compute_aabb(pos);
 
             let vec_min: Vec2 = aabb.mins.into();
             let vec_max: Vec2 = aabb.maxs.into();
 
-            let min = vec_min.floor();
-            let x_min = min.x as usize;
-            let y_min = min.y as usize;
+            let (min_row, min_column) = self.to_row_column(vec_min);
+            let (max_row, max_column) = self.to_row_column(vec_max);
 
-            let max = vec_max.ceil();
-            let x_max = max.x as usize;
-            let y_max = max.y as usize;
+            let costmap_cell_coordinates = Iterator::zip(min_row..=max_row, min_column..=max_column).collect::<Vec<(usize, usize)>>();
 
-            // for x in x_min..=x_max {
-            //     for y in y_min..=y_max {
-            //         // cell.interaction_groups = InteractionGroups::new(
-            //         //     cell.interaction_groups.memberships | interaction_groups.memberships,
-            //         //     cell.interaction_groups.filter | interaction_groups.filter
-            //         // );
-            //         let (row, column) = self.to_row_column(Vec2::new(x as f32, y as f32));
-            //         self.data[row][column].cost = cost;
-            //     }
-            // }
-                    let (row, column) = self.to_row_column(pos.translation.into());
-                    self.data[row][column].cost = cost;
+            for (row, column) in costmap_cell_coordinates.iter() {
+                    // cell.interaction_groups = InteractionGroups::new(
+                    //     cell.interaction_groups.memberships | interaction_groups.memberships,
+                    //     cell.interaction_groups.filter | interaction_groups.filter
+                    // );
+                self.data[*row][*column].cost = cost;
+            }
+                    // let (row, column) = self.to_row_column(pos.translation.into());
+                    // self.data[row][column].cost = cost;
+            costmap_cell_coordinates
         }
 }
 
