@@ -73,7 +73,7 @@ fn reset_costmap(
     timer.0.tick(time.delta());
     if timer.0.finished() {
         for mut element in costmap.data.iter_mut().flat_map(|r| r.iter_mut()) {
-            element.cost = Cost::UNOCCUPIED;
+            element.interaction_groups = InteractionGroups::none();
         }
         for (_, mesh_handle) in viz_query.iter_mut() {
             if let Some(mesh) = meshes.get_mut(mesh_handle) {
@@ -93,9 +93,10 @@ fn update(
     mut viz_query: Query<(&CostmapCellCoordinates, &Handle<Mesh>)>
 ) {
     for (ColliderFlags { collision_groups: ig, .. }, RigidBodyPosition { position, .. }, shape) in q.iter() {
-        let occupied_cells = costmap.set_cost(Cost::OCCUPIED, ig, shape, &position);
+        let occupied_cells = costmap.set_cost(ig, shape, &position);
         for (CostmapCellCoordinates { coordinates }, mesh_handle) in viz_query.iter_mut() {
             if occupied_cells.contains(coordinates) {
+                let CostmapCell { interaction_groups } = costmap.data[coordinates.0][coordinates.1];
                 if let Some(mesh) = meshes.get_mut(mesh_handle) {
                     let color_attribute = <[f32; 4]>::from(OCCUPIED_COLOR);
                     mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, vec![
@@ -109,24 +110,15 @@ fn update(
 
 struct CostmapResetTimer(Timer);
 
-
-#[derive(Clone, Copy, Debug)]
-pub enum Cost {
-    UNOCCUPIED,
-    OCCUPIED
-}
-
 #[derive(Clone, Copy)]
 pub struct CostmapCell {
-    cost: Cost,
     interaction_groups: InteractionGroups
 }
 
 impl Default for CostmapCell {
     fn default() -> Self {
         CostmapCell {
-            cost: Cost::UNOCCUPIED,
-            interaction_groups: InteractionGroups::all()
+            interaction_groups: InteractionGroups::none()
         }
     }
 }
@@ -154,7 +146,6 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
 
     fn set_cost(
         &mut self,
-        cost: Cost,
         interaction_groups: &InteractionGroups,
         shape: &SharedShape,
         pos: &Isometry2<f32>) -> Vec<(usize, usize)> {
@@ -175,16 +166,14 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
 
             for row in min_row..=max_row {
                 for column in min_column..=max_column {
-                    // cell.interaction_groups = InteractionGroups::new(
-                    //     cell.interaction_groups.memberships | interaction_groups.memberships,
-                    //     cell.interaction_groups.filter | interaction_groups.filter
-                    // );
-                    self.data[row][column].cost = cost;
+                    let cell = &mut self.data[row][column];
+                    cell.interaction_groups = InteractionGroups::new(
+                        cell.interaction_groups.memberships | interaction_groups.memberships,
+                        cell.interaction_groups.filter | interaction_groups.filter
+                    );
                     costmap_cell_coordinates.push((row,column));
                 }
             }
-                    // let (row, column) = self.to_row_column(pos.translation.into());
-                    // self.data[row][column].cost = cost;
             costmap_cell_coordinates
         }
 }
