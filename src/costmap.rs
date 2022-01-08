@@ -16,6 +16,7 @@ impl Plugin for CostmapPlugin {
 
 const COSTMAP_SIZE: usize = 40; // number of cells in each dimension (this squared for total)
 const COSTMAP_RESOLUTION: f32 = 0.25; // meters per costmap cell
+const COSTMAP_RESET_PERIOD: f32 = 0.5; // seconds
 
 const OCCUPIED_COLOR: Color = Color::rgba(1.0, 0.0, 0.0, 0.5);
 const UNOCCUPIED_COLOR: Color = Color::rgba(0.0, 0.0, 1.0, 0.5);
@@ -59,7 +60,7 @@ fn setup(
 
     commands.insert_resource(costmap);
 
-    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(0.2, true)));
+    commands.insert_resource(CostmapResetTimer(Timer::from_seconds(COSTMAP_RESET_PERIOD, true)));
 }
 
 fn reset_costmap(
@@ -91,8 +92,8 @@ fn update(
     q: Query<(&ColliderFlags, &RigidBodyPosition, &ColliderShape)>,
     mut viz_query: Query<(&CostmapCellCoordinates, &Handle<Mesh>)>
 ) {
-    for (i, (ColliderFlags { collision_groups: ig, .. }, rb_pos, shape)) in q.iter().enumerate() {
-        let occupied_cells = costmap.set_cost(Cost::OCCUPIED, ig, shape, &rb_pos.position);
+    for (ColliderFlags { collision_groups: ig, .. }, RigidBodyPosition { position, .. }, shape) in q.iter() {
+        let occupied_cells = costmap.set_cost(Cost::OCCUPIED, ig, shape, &position);
         for (CostmapCellCoordinates { coordinates }, mesh_handle) in viz_query.iter_mut() {
             if occupied_cells.contains(coordinates) {
                 if let Some(mesh) = meshes.get_mut(mesh_handle) {
