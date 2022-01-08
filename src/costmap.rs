@@ -97,6 +97,7 @@ fn update(
         for (CostmapCellCoordinates { coordinates }, mesh_handle) in viz_query.iter_mut() {
             if occupied_cells.contains(coordinates) {
                 let CostmapCell { interaction_groups } = costmap.data[coordinates.0][coordinates.1];
+                // TODO: set color based off interaction_groups
                 if let Some(mesh) = meshes.get_mut(mesh_handle) {
                     let color_attribute = <[f32; 4]>::from(OCCUPIED_COLOR);
                     mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, vec![
