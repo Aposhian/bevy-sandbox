@@ -87,7 +87,7 @@ impl Into<Vec2> for GridPoint {
     }
 }
 
-const MAX_TOI : f32 = 0.1; // seconds
+const MAX_TOI : f32 = 1.0; // seconds
 
 const INFLATION_LAYER : f32 = 0.2; // m
 
