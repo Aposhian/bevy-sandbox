@@ -37,9 +37,7 @@ pub struct Path {
     pub points: Vec<Vec2>
 }
 
-const MAX_TOI: f32 = 0.1;
-
-const THETA_STEPS: u8 = 4;
+const THETA_STEPS: u8 = 8;
 
 const GRID_SCALE: u8 = 10;
 
@@ -88,6 +86,8 @@ impl Into<Vec2> for GridPoint {
         Vec2::new(self.0 as f32 / GRID_SCALE as f32, self.1 as f32 / GRID_SCALE as f32)
     }
 }
+
+const MAX_TOI : f32 = 0.1; // seconds
 
 const INFLATION_LAYER : f32 = 0.2; // m
 
@@ -151,10 +151,19 @@ fn compute_path_to_goal(
                             Some((_, toi)) => toi.toi,
                             None => MAX_TOI
                         };
-                        let next = GridPoint::from(toi * direction);
-                        (position + next, position.distance(next))
+                        let next = position + GridPoint::from(toi * direction);
+                        let min_x = std::cmp::min(position.0, next.0);
+                        let max_x = std::cmp::max(position.0, next.0);
+                        let min_y = std::cmp::min(position.1, next.1);
+                        let max_y = std::cmp::max(position.1, next.1);
+                        Iterator::zip(min_x..=max_x, min_y..=max_y)
+                            .map(move |(x,y)| {
+                                let p = GridPoint(x,y);
+                                (p, position.distance(p))
+                            })
                     })
-                    .filter(|(next, _)| *next != *position) // not sure if this is necessary
+                    .flatten()
+                    .filter(|(next, _)| *next != *position)
                     .collect::<Vec<(GridPoint, i32)>>().into_iter()
             },
             |position| {
