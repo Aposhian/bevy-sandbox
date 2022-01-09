@@ -14,7 +14,7 @@ impl Plugin for CostmapPlugin {
     }
 }
 
-const COSTMAP_SIZE: usize = 40; // number of cells in each dimension (this squared for total)
+pub const COSTMAP_SIZE: usize = 40; // number of cells in each dimension (this squared for total)
 const COSTMAP_RESOLUTION: f32 = 0.25; // meters per costmap cell
 const COSTMAP_RESET_PERIOD: f32 = 0.5; // seconds
 
@@ -41,7 +41,7 @@ fn setup(
 
     for row in 0..costmap.data.len() {
         for column in 0..costmap.data[0].len() {
-            let physics_position = costmap.to_physics_position(row, column);
+            let physics_position = costmap.to_physics_position((row, column));
             let pixel_position = rc.scale * physics_position;
             let pixels_per_box = COSTMAP_RESOLUTION * rc.scale;
             commands.spawn_bundle(GeometryBuilder::build_as(
@@ -113,7 +113,7 @@ struct CostmapResetTimer(Timer);
 
 #[derive(Clone, Copy)]
 pub struct CostmapCell {
-    interaction_groups: InteractionGroups
+    pub interaction_groups: InteractionGroups
 }
 
 impl Default for CostmapCell {
@@ -125,7 +125,7 @@ impl Default for CostmapCell {
 }
 pub struct Costmap<const M: usize, const N: usize> {
     transform: Mat3,
-    data: [[CostmapCell; N]; M]
+    pub data: [[CostmapCell; N]; M]
 }
 
 impl<const M: usize, const N: usize> Costmap<M,N> {
@@ -136,13 +136,13 @@ impl<const M: usize, const N: usize> Costmap<M,N> {
         }
     }
 
-    fn to_row_column(&self, physics_position: Vec2) -> (usize, usize) {
+    pub fn to_row_column(&self, physics_position: Vec2) -> (usize, usize) {
         let transformed = (self.transform.transform_vector2(physics_position)).round();
         (transformed.x as usize, transformed.y as usize)
     }
 
-    fn to_physics_position(&self, row: usize, column: usize) -> Vec2 {
-        self.transform.inverse().transform_vector2(Vec2::new(row as f32, column as f32))
+    pub fn to_physics_position(&self, row_column: (usize, usize)) -> Vec2 {
+        self.transform.inverse().transform_vector2(Vec2::new(row_column.0 as f32, row_column.1 as f32))
     }
 
     fn set_cost(
