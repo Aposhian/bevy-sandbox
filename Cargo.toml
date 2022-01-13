@@ -2,7 +2,7 @@
 name = "bevy_sandbox"
 version = "0.1.0"
 authors = ["Adam Aposhian <aposhian.dev@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 bevy = { version = "0.5.0", features = ["bevy_wgpu", "bevy_winit"] }
