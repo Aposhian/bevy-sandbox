@@ -1,0 +1,143 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "maps/open.tmx",
+    "expandedProjectPaths": [
+        "/home/adam/Documents/tiled/tilesets",
+        "tilesets",
+        "textures",
+        "/home/adam/Documents/tiled/templates",
+        "/home/adam/Documents",
+        "templates",
+        ".",
+        "maps",
+        "/home/adam/Documents/tiled"
+    ],
+    "file.lastUsedOpenFilter": "All Files (*)",
+    "fileStates": {
+        "/home/adam/Documents/grass_walls.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "/home/adam/Documents/ground-walls.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "/home/adam/Documents/tiled/demo.tmx": {
+            "scale": 1.5,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 426,
+                "y": 281.6666666666667
+            }
+        },
+        "/home/adam/Documents/tiled/tilesets/grass_walls.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "/home/adam/Documents/tiled/tilesets/open.tmx": {
+            "scale": 3,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 639.6666666666666,
+                "y": 1099.5
+            }
+        },
+        "/home/adam/Downloads/000-0-0.tmx": {
+            "scale": 0.33411931818181817,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 610.5603265028483,
+                "y": 878.4287050420883
+            }
+        },
+        "/home/adam/Downloads/000-0-0.tmx#Box": {
+            "scaleInDock": 1
+        },
+        "/home/adam/Downloads/000-0-0.tmx#Collision": {
+            "scaleInDock": 1
+        },
+        "/home/adam/Downloads/000-0-0.tmx#Indoor": {
+            "scaleInDock": 1
+        },
+        "/home/adam/Downloads/000-0-0.tmx#Indoor Fringe": {
+            "scaleInDock": 1
+        },
+        "/home/adam/Downloads/000-0-0.tmx#Shadow": {
+            "scaleInDock": 1
+        },
+        "/home/adam/github/aposhian/bevy-sandbox/assets/isometric.tmx": {
+            "scale": 2,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 1782,
+                "y": 2624.25
+            }
+        },
+        "/home/adam/github/aposhian/bevy-sandbox/assets/orthogonal.tmx": {
+            "scale": 0.53496875,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 805.6545358957884,
+                "y": 376.65751504176643
+            }
+        },
+        "/home/adam/github/aposhian/bevy-sandbox/assets/simple_tileset.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "demo.tmx": {
+            "scale": 0.09737499999999999,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 790.7573812580232,
+                "y": 806.1617458279852
+            }
+        },
+        "maps/grass_walls.tsx": {
+            "scaleInDock": 1
+        },
+        "maps/open.tmx": {
+            "scale": 0.75,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 568,
+                "y": 575.3333333333334
+            }
+        },
+        "tilesets/grass_walls.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        }
+    },
+    "last.externalTilesetPath": "/home/adam/github/aposhian/bevy-sandbox/assets/tiled/tilesets",
+    "last.imagePath": "/home/adam/Documents/tiled/textures",
+    "last.objectTemplatePath": "/home/adam/github/aposhian/bevy-sandbox/assets/tiled/templates",
+    "map.height": 50,
+    "map.lastUsedFormat": "tmx",
+    "map.orientation": null,
+    "map.width": 50,
+    "openFiles": [
+        "maps/open.tmx",
+        "tilesets/grass_walls.tsx"
+    ],
+    "project": "tiled.tiled-project",
+    "property.type": "bool",
+    "recentFiles": [
+        "tilesets/grass_walls.tsx",
+        "maps/open.tmx",
+        "demo.tmx",
+        "/home/adam/Documents/tiled/tilesets/grass_walls.tsx",
+        "/home/adam/Documents/tiled/tilesets/open.tmx",
+        "/home/adam/Documents/tiled/demo.tmx",
+        "/home/adam/Documents/grass_walls.tsx",
+        "/home/adam/Documents/ground-walls.tsx",
+        "/home/adam/Downloads/000-0-0.tmx",
+        "/home/adam/github/aposhian/bevy-sandbox/assets/simple_tileset.tsx",
+        "/home/adam/github/aposhian/bevy-sandbox/assets/orthogonal.tmx",
+        "/home/adam/github/aposhian/bevy-sandbox/assets/isometric.tmx"
+    ],
+    "tileset.lastUsedFormat": "tsx"
+}
