@@ -11,9 +11,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    let mut builder = GeometryBuilder::new();
-
-    builder
+    let builder = GeometryBuilder::new()
         .add(&shapes::Line(Vec2::ZERO, Vec2::X * 100.0))
         .add(&shapes::Line(Vec2::X * 100.0, Vec2::new(100.0, 100.0)));
 
@@ -22,7 +20,7 @@ fn setup(mut commands: Commands) {
         DrawMode::Stroke(StrokeMode {
             options: StrokeOptions::default().with_line_width(10.0),
             color: Color::BLACK
-        },
-        Transform::default(),
+        }),
+        Transform::default()
     ));
 }
