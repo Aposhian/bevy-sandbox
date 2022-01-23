@@ -1,21 +1,19 @@
 // Testing tiled integration
 
 use bevy::prelude::*;
-use bevy_sandbox::SandboxPlugins;
 use bevy_sandbox::tiled::{TiledPlugin, TilemapSpawnEvent};
+use bevy_sandbox::SandboxPlugins;
 use std::path::Path;
 
 fn main() {
-    App::build()
+    App::new()
         .add_plugin(TiledPlugin)
-        .add_startup_system(spawn_tilemap.system())
+        .add_startup_system(spawn_tilemap)
         .run();
 }
 
-fn spawn_tilemap(
-    mut tilemap_spawn_event: EventWriter<TilemapSpawnEvent>
-) {
+fn spawn_tilemap(mut tilemap_spawn_event: EventWriter<TilemapSpawnEvent>) {
     tilemap_spawn_event.send(TilemapSpawnEvent {
-        path: Path::new("assets/tiled/maps/open.tmx")
+        path: Path::new("assets/tiled/maps/open.tmx"),
     })
 }

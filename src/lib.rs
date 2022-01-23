@@ -1,32 +1,31 @@
 use benimator::AnimationPlugin;
-use bevy_prototype_lyon::plugin::ShapePlugin;
-use bevy_rapier2d::prelude::*;
-use bevy::render::pass::ClearColor;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
+use bevy_prototype_lyon::plugin::ShapePlugin;
+use bevy_rapier2d::prelude::*;
 
-pub mod simple_figure;
+mod ai;
+mod ball;
+mod camera;
+mod ecs;
+mod health;
 mod input;
 pub mod obstacle;
-mod camera;
-mod ball;
-mod health;
 mod pathfinding;
 mod pathfollowing;
-mod ai;
-mod ecs;
+pub mod simple_figure;
 pub mod tiled;
 
 use crate::pathfinding::PathfindingPlugin;
-use simple_figure::SimpleFigurePlugin;
+use ai::AiPlugin;
+use ball::BallPlugin;
+use camera::CameraPlugin;
+use ecs::DespawnPlugin;
+use health::HealthPlugin;
 use input::InputPlugin;
 use obstacle::ObstaclePlugin;
-use camera::CameraPlugin;
-use ball::BallPlugin;
-use health::HealthPlugin;
 use pathfollowing::PathfollowingPlugin;
-use ai::AiPlugin;
-use ecs::DespawnPlugin;
+use simple_figure::SimpleFigurePlugin;
 pub struct SandboxPlugins;
 
 impl PluginGroup for SandboxPlugins {
@@ -51,12 +50,12 @@ impl PluginGroup for SandboxPlugins {
 pub struct DefaultResources;
 
 impl Plugin for DefaultResources {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(Color::rgb(
-                0xF9 as f32 / 255.0,
-                0xF9 as f32 / 255.0,
-                0xFF as f32 / 255.0,
-            )))
-            .insert_resource(Msaa::default());
+            0xF9 as f32 / 255.0,
+            0xF9 as f32 / 255.0,
+            0xFF as f32 / 255.0,
+        )))
+        .insert_resource(Msaa::default());
     }
 }

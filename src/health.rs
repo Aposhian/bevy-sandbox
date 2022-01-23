@@ -6,34 +6,31 @@ use crate::ecs::DespawnEvent;
 pub struct HealthPlugin;
 
 impl Plugin for HealthPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app
-            .add_system(damage.system())
-            .add_system(health_despawner.system());
+    fn build(&self, app: &mut App) {
+        app.add_system(damage).add_system(health_despawner);
     }
 }
 
+#[derive(Component)]
 pub struct Health {
     pub max: i32,
-    pub current: i32
+    pub current: i32,
 }
 
 impl Health {
     pub fn from_max(max: i32) -> Self {
-        Health {
-            max,
-            current: max
-        }
+        Health { max, current: max }
     }
 }
 
+#[derive(Component)]
 pub struct CollisionDamage {
-    pub damage: i32
+    pub damage: i32,
 }
 
 fn health_despawner(
     q: Query<(Entity, &Health), Changed<Health>>,
-    mut despawn: EventWriter<DespawnEvent>
+    mut despawn: EventWriter<DespawnEvent>,
 ) {
     for (entity, health) in q.iter() {
         if health.current <= 0 {
@@ -41,7 +38,6 @@ fn health_despawner(
         }
     }
 }
-
 
 fn damage(
     damager_query: Query<&CollisionDamage>,

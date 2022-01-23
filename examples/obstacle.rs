@@ -4,10 +4,10 @@ use bevy::prelude::*;
 use bevy_sandbox::SandboxPlugins;
 
 fn main() {
-    App::build()
+    App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(SandboxPlugins)
-        .add_startup_system(bevy_sandbox::simple_figure::default_spawn.system())
-        .add_startup_system(bevy_sandbox::obstacle::spawn.system())
+        .add_startup_system(bevy_sandbox::simple_figure::default_spawn)
+        .add_startup_system(bevy_sandbox::obstacle::spawn)
         .run();
 }

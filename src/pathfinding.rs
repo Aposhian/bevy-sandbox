@@ -1,10 +1,10 @@
+use bevy::math::Mat2;
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
-use bevy_rapier2d::na::Isometry2;
 use bevy_prototype_lyon::prelude::*;
+use bevy_rapier2d::na::Isometry2;
+use bevy_rapier2d::prelude::*;
 use pathfinding::prelude::astar;
 use std::f32::consts::TAU;
-use bevy::math::Mat2;
 use std::ops::Add;
 use std::ops::Sub;
 
@@ -15,26 +15,27 @@ use crate::input::PlayerTag;
 pub struct PathfindingPlugin;
 
 impl Plugin for PathfindingPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        app
-            .add_system(compute_path_to_goal.system())
-            .add_system(draw_paths.system());
+    fn build(&self, app: &mut App) {
+        app.add_system(compute_path_to_goal).add_system(draw_paths);
     }
 }
 
+#[derive(Component)]
 pub struct GoalPosition {
-    pub position: Isometry2<f32>
+    pub position: Isometry2<f32>,
 }
 
 impl Default for GoalPosition {
     fn default() -> Self {
         GoalPosition {
-            position: Isometry::identity()
+            position: Isometry::identity(),
         }
     }
 }
+
+#[derive(Component)]
 pub struct Path {
-    pub points: Vec<Vec2>
+    pub points: Vec<Vec2>,
 }
 
 const THETA_STEPS: u8 = 8;
@@ -83,31 +84,36 @@ impl From<Vec2> for GridPoint {
 
 impl Into<Vec2> for GridPoint {
     fn into(self) -> Vec2 {
-        Vec2::new(self.0 as f32 / GRID_SCALE as f32, self.1 as f32 / GRID_SCALE as f32)
+        Vec2::new(
+            self.0 as f32 / GRID_SCALE as f32,
+            self.1 as f32 / GRID_SCALE as f32,
+        )
     }
 }
 
-const MAX_TOI : f32 = 1.0; // seconds
+const MAX_TOI: f32 = 1.0; // seconds
 
-const INFLATION_LAYER : f32 = 0.2; // m
+const INFLATION_LAYER: f32 = 0.2; // m
 
 fn compute_path_to_goal(
     mut commands: Commands,
     player: Query<Entity, With<PlayerTag>>,
-    query: Query<(Entity, &RigidBodyPosition, &ColliderShape, &GoalPosition), Or<(Added<GoalPosition>, Changed<GoalPosition>)>>,
+    query: Query<
+        (
+            Entity,
+            &RigidBodyPositionComponent,
+            &ColliderShapeComponent,
+            &GoalPosition,
+        ),
+        Or<(Added<GoalPosition>, Changed<GoalPosition>)>,
+    >,
     query_pipeline: Res<QueryPipeline>,
-    collider_query: QueryPipelineColliderComponentsQuery
+    collider_query: QueryPipelineColliderComponentsQuery,
 ) {
-
     let player_entity = player.iter().next();
 
-    for (
-        entity,
-        RigidBodyPosition { position: start, .. },
-        shape,
-        GoalPosition { position: goal }
-    ) in query.iter() {
-        let start_grid = GridPoint::from(Vec2::from(start.translation));
+    for (entity, start_position, shape, GoalPosition { position: goal }) in query.iter() {
+        let start_grid = GridPoint::from(Vec2::from(start_position.position.translation));
         let goal_grid = GridPoint::from(Vec2::from(goal.translation));
         info!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
@@ -117,9 +123,10 @@ fn compute_path_to_goal(
             |position| {
                 let query_pipeline = &query_pipeline;
                 let collider_set = &collider_set;
-                (0..THETA_STEPS).map(move |theta_step| {
+                (0..THETA_STEPS)
+                    .map(move |theta_step| {
                         let position = position.clone();
-                        let theta: f32 =  theta_step as f32 * (TAU / THETA_STEPS as f32);
+                        let theta: f32 = theta_step as f32 * (TAU / THETA_STEPS as f32);
                         let vec_position: Vec2 = position.into();
                         let direction: Vec2 = Mat2::from_angle(theta) * Vec2::X;
                         let direction = direction.normalize_or_zero();
@@ -127,11 +134,12 @@ fn compute_path_to_goal(
                         let inflated_shape = match shape.shape_type() {
                             ShapeType::Cuboid => {
                                 let cuboid = shape.as_cuboid().unwrap();
-                                ColliderShape::cuboid(cuboid.half_extents[0] + INFLATION_LAYER, cuboid.half_extents[1] + INFLATION_LAYER)
-                            },
-                            _ => {
-                                ColliderShape::cuboid(INFLATION_LAYER, INFLATION_LAYER)
+                                ColliderShape::cuboid(
+                                    cuboid.half_extents[0] + INFLATION_LAYER,
+                                    cuboid.half_extents[1] + INFLATION_LAYER,
+                                )
                             }
+                            _ => ColliderShape::cuboid(INFLATION_LAYER, INFLATION_LAYER),
                         };
 
                         let toi = match query_pipeline.cast_shape(
@@ -142,41 +150,39 @@ fn compute_path_to_goal(
                             MAX_TOI,
                             InteractionGroups::new(0b0100, 0b0100),
                             Some(&|handle| {
-                                handle != entity.handle() && match player_entity {
-                                    Some(player) => handle != player.handle(),
-                                    None => true
-                                }
-                            })
+                                handle != entity.handle()
+                                    && match player_entity {
+                                        Some(player) => handle != player.handle(),
+                                        None => true,
+                                    }
+                            }),
                         ) {
                             Some((_, toi)) => toi.toi,
-                            None => MAX_TOI
+                            None => MAX_TOI,
                         };
                         let next = position + GridPoint::from(toi * direction);
                         let min_x = std::cmp::min(position.0, next.0);
                         let max_x = std::cmp::max(position.0, next.0);
                         let min_y = std::cmp::min(position.1, next.1);
                         let max_y = std::cmp::max(position.1, next.1);
-                        Iterator::zip(min_x..=max_x, min_y..=max_y)
-                            .map(move |(x,y)| {
-                                let p = GridPoint(x,y);
-                                (p, position.distance(p))
-                            })
+                        Iterator::zip(min_x..=max_x, min_y..=max_y).map(move |(x, y)| {
+                            let p = GridPoint(x, y);
+                            (p, position.distance(p))
+                        })
                     })
                     .flatten()
                     .filter(|(next, _)| *next != *position)
-                    .collect::<Vec<(GridPoint, i32)>>().into_iter()
+                    .collect::<Vec<(GridPoint, i32)>>()
+                    .into_iter()
             },
-            |position| {
-                position.distance(goal_grid)
-            },
-            |position| *position == goal_grid
+            |position| position.distance(goal_grid),
+            |position| *position == goal_grid,
         );
 
         if let Some((path, _)) = result {
-            commands.entity(entity)
-                .insert(Path {
-                    points: path.iter().map(|&point| { point.into() }).collect()
-                });
+            commands.entity(entity).insert(Path {
+                points: path.iter().map(|&point| point.into()).collect(),
+            });
         } else {
             warn!("no path found");
         }
@@ -186,8 +192,11 @@ fn compute_path_to_goal(
 fn draw_paths(
     mut commands: Commands,
     rc: Res<RapierConfiguration>,
-    mut path_query: Query<(Entity, &Path, Option<&mut BondedEntities>), Or<(Added<Path>, Changed<Path>)>>,
-    mut despawn: EventWriter<DespawnEvent>
+    mut path_query: Query<
+        (Entity, &Path, Option<&mut BondedEntities>),
+        Or<(Added<Path>, Changed<Path>)>,
+    >,
+    mut despawn: EventWriter<DespawnEvent>,
 ) {
     for (path_entity, path, bonded_entities) in path_query.iter_mut() {
         info!("Draw path");
@@ -195,18 +204,19 @@ fn draw_paths(
 
         for points in path.points.windows(2) {
             if let [point1, point2] = points {
-                builder.add(&shapes::Line(*point1 * rc.scale, *point2 * rc.scale));
+                builder = builder.add(&shapes::Line(*point1 * rc.scale, *point2 * rc.scale));
             }
         }
 
-        let line_entity = commands.spawn_bundle(builder
-            .build(
-                ShapeColors::new(Color::RED),
-                DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
-                Transform::from_translation(Vec3::new(0.0, 0.0, 10.0))
-            )
-        )
-        .id();
+        let line_entity = commands
+            .spawn_bundle(builder.build(
+                DrawMode::Stroke(StrokeMode {
+                    options: StrokeOptions::default().with_line_width(2.0),
+                    color: Color::RED,
+                }),
+                Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
+            ))
+            .id();
 
         if let Some(mut bonded_entities) = bonded_entities {
             for entity in bonded_entities.iter() {
@@ -215,7 +225,9 @@ fn draw_paths(
             bonded_entities.clear();
             bonded_entities.push(line_entity);
         } else {
-            commands.entity(path_entity).insert(BondedEntities(vec![line_entity]));
+            commands
+                .entity(path_entity)
+                .insert(BondedEntities(vec![line_entity]));
         }
     }
 }
