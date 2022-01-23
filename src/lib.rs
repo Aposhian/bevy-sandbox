@@ -15,6 +15,7 @@ mod pathfinding;
 mod pathfollowing;
 mod ai;
 mod ecs;
+pub mod tiled;
 
 use crate::pathfinding::PathfindingPlugin;
 use simple_figure::SimpleFigurePlugin;

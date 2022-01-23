@@ -32,7 +32,7 @@ pub struct SpriteSheetConfig {
 }
 
 const SPRITE_SHEET: SpriteSheetConfig = SpriteSheetConfig {
-    path: "simple_figure_32x32.png",
+    path: "spritesheets/simple_figure_32x32.png",
     tile_size: (32.0,32.0),
     columns: 3,
     rows: 6
