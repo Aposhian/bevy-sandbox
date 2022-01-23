@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 use std::path::Path;
 
 use tiled::parse_file;

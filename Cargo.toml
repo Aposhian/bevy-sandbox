@@ -8,30 +8,8 @@ edition = "2021"
 bevy = { version = "0.5.0", features = ["bevy_wgpu", "bevy_winit"] }
 benimator = "^0.3"
 bevy_rapier2d = "^0.11"
-bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap.git", rev = "f075508b45bf6257d55f7fa4b4db6d5adea4b044", features = ["ldtk"] }
-ldtk_rust = "^0.5"
 serde_json = "^1.0"
 pathfinding = "^2.2"
 bevy_prototype_lyon = "0.3.1"
 lyon_tessellation = "0.17.10"
 tiled = "0.9.5"
-
-[[example]]
-name = "empty"
-path = "examples/empty.rs"
-
-[[example]]
-name = "player"
-path = "examples/player.rs"
-
-[[example]]
-name = "obstacle"
-path = "examples/obstacle.rs"
-
-[[example]]
-name = "ldtk"
-path = "examples/ldtk.rs"
-
-[[example]]
-name = "ldtk_entities"
-path = "examples/ldtk_entities.rs"

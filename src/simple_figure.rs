@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use bevy_rapier2d::{na::Isometry2, prelude::*};
 use benimator::{Play, SpriteSheetAnimation};
 use std::f32::consts::FRAC_PI_4;
-use ldtk_rust::EntityInstance;
 
 use crate::input::{PlayerTag, MoveAction};
 use crate::camera::CameraTarget;
@@ -189,37 +188,6 @@ impl Default for SimpleFigureSpawnEvent {
             scale: 1.0,
             z: 0.0,
             playable: false
-        }
-    }
-}
-
-impl From<(&EntityInstance, u16)> for SimpleFigureSpawnEvent {
-    fn from(ldtk_info: (&EntityInstance, u16)) -> Self {
-        let (entity, layer_id) = ldtk_info;
-        assert!(entity.identifier.as_str() == "SimpleFigure");
-        let playable = entity.field_instances.iter()
-            .filter_map(|field| {
-                match field.identifier.as_str() {
-                    "Playable" => {
-                        match field.value {
-                            Some(serde_json::Value::Bool(playable)) => Some(playable),
-                            _ => None
-                        }
-                    },
-                    _ => None
-                }
-            })
-            .next()
-            .unwrap_or(false);
-        // TODO: refactor this out for all entities
-        SimpleFigureSpawnEvent {
-            playable,
-            position: Isometry2::new(
-                [entity.grid[0] as f32, -entity.grid[1] as f32].into(),
-                0.0
-            ),
-            z: layer_id as f32,
-            ..Default::default()
         }
     }
 }
