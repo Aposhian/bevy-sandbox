@@ -174,15 +174,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug example 'ldtk'",
+            "name": "Debug example 'tiled'",
             "cargo": {
                 "args": [
                     "build",
-                    "--example=ldtk",
+                    "--example=tiled",
                     "--package=bevy_sandbox"
                 ],
                 "filter": {
-                    "name": "ldtk",
+                    "name": "tiled",
                     "kind": "example"
                 }
             },
