@@ -6,6 +6,7 @@ use std::path::Path;
 
 fn main() {
     App::new()
+        .add_plugins(DefaultPlugins)
         .add_plugin(TiledPlugin)
         .add_startup_system(spawn_tilemap)
         .run();
