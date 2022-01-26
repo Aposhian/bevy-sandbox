@@ -65,14 +65,14 @@ fn spawn(
                             commands.spawn_bundle(SpriteSheetBundle {
                                 texture_atlas: texture_atlas.clone(),
                                 sprite: TextureAtlasSprite {
-                                    index: tile.gid as usize,
+                                    index: (tile.gid - 1) as usize,
                                     flip_x: tile.flip_h,
                                     flip_y: tile.flip_v,
                                     ..Default::default()
                                 },
                                 transform: Transform::from_translation(Vec3::new(
                                     layer.offset_x + (column * 32) as f32,
-                                    layer.offset_y + (row * 32) as f32,
+                                    32.0 + layer.offset_y - (row * 32) as f32,
                                     layer.layer_index as f32
                                 )),
                                 ..Default::default()
