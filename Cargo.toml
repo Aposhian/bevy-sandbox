@@ -13,3 +13,4 @@ pathfinding = "^2.2"
 bevy_prototype_lyon = "^0.4"
 lyon_tessellation = "0.17.10"
 tiled = { git = "https://github.com/mapeditor/rs-tiled" }
+bevy_ecs_tilemap = "^0.5"
