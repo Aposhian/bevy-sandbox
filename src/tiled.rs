@@ -126,7 +126,7 @@ fn spawn(
                                 .unwrap();
 
                             let tile = Tile {
-                                texture_index: (tile.id() as u16 - 1),
+                                texture_index: tile.id() as u16,
                                 flip_x: tile.flip_h,
                                 flip_y: tile.flip_v,
                                 flip_d: tile.flip_d,

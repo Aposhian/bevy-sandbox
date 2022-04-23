@@ -200,7 +200,7 @@ impl Default for SimpleFigureSpawnEvent {
         SimpleFigureSpawnEvent {
             position: Isometry2::identity(),
             scale: 1.0,
-            z: 0.0,
+            z: 2.0,
             playable: false,
         }
     }
