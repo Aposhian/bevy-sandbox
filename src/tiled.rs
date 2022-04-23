@@ -67,7 +67,7 @@ fn spawn(
                 info!("loading layer {:?}", layer.id());
                 if layer.visible {
                     info!("layer {:?} is visible", layer.id());
-                    const CHUNK_SIZE: u32 = 64;
+                    const CHUNK_SIZE: u32 = 256;
 
                     let mut layer_settings = LayerSettings::new(
                         MapSize(
