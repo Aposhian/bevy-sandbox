@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
 use std::path::Path;
 
@@ -8,7 +8,10 @@ pub struct TiledPlugin;
 
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<TilemapSpawnEvent>().add_system(spawn);
+        app
+            .add_event::<TilemapSpawnEvent>()
+            .add_system(spawn)
+            .add_system(set_texture_filters_to_nearest);
     }
 }
 
@@ -23,23 +26,34 @@ pub struct TilemapSpawnEvent {
     pub path: &'static Path,
 }
 
+pub fn set_texture_filters_to_nearest(
+    mut texture_events: EventReader<AssetEvent<Image>>,
+    mut textures: ResMut<Assets<Image>>,
+) {
+    // quick and dirty, run this for all textures anytime a texture is created.
+    for event in texture_events.iter() {
+        match event {
+            AssetEvent::Created { handle } => {
+                if let Some(mut texture) = textures.get_mut(handle) {
+                    texture.texture_descriptor.usage = TextureUsages::TEXTURE_BINDING
+                        | TextureUsages::COPY_SRC
+                        | TextureUsages::COPY_DST;
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+
 fn load_texture_atlas(
     tileset: &Tileset,
-    asset_server: &Res<AssetServer>,
-    texture_atlas_assets: &mut ResMut<Assets<TextureAtlas>>,
+    asset_server: &Res<AssetServer>
 ) -> Option<Handle<Image>> {
     if let Some(image) = &tileset.image {
         let path = std::fs::canonicalize(&image.source).unwrap();
         info!("loading texture: {path:?}");
         let texture_handle = asset_server.load(path);
-
-        let texture_atlas = TextureAtlas::from_grid(
-            texture_handle.clone(),
-            Vec2::new(tileset.tile_width as f32, tileset.tile_height as f32),
-            image.width as usize / tileset.tile_width as usize,
-            image.height as usize / tileset.tile_height as usize,
-        );
-        texture_atlas_assets.add(texture_atlas);
         return Some(texture_handle);
     }
     None
@@ -49,7 +63,6 @@ fn load_texture_atlas(
 fn spawn(
     mut spawn_events: EventReader<TilemapSpawnEvent>,
     asset_server: Res<AssetServer>,
-    mut texture_atlas_assets: ResMut<Assets<TextureAtlas>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>
 ) {
@@ -60,7 +73,7 @@ fn spawn(
         for tileset in map.tilesets() {
             // TODO: make this handle multiple textures
             let texture_handle =
-                load_texture_atlas(&tileset, &asset_server, &mut texture_atlas_assets).unwrap();
+                load_texture_atlas(&tileset, &asset_server).unwrap();
 
             // TODO: take this out of this loop
             for layer in map.layers() {
