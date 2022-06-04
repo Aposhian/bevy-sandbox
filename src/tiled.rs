@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use tiled::{Tileset, Loader};
 
@@ -62,6 +62,101 @@ fn load_texture_atlas(
     None
 }
 
+fn process_layer(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    layer: &tiled::Layer,
+    tileset: &Arc<Tileset>,
+    texture_handle: &Handle<Image>,
+    tiled_map: &tiled::Map,
+    ecs_map: &mut bevy_ecs_tilemap::Map
+) {
+    info!("loading layer {:?}", layer.id());
+    if layer.visible {
+        info!("layer {:?} is visible", layer.id());
+        const CHUNK_SIZE: u32 = 256;
+
+        let mut layer_settings = LayerSettings::new(
+            MapSize(
+                (tiled_map.width as f32 / CHUNK_SIZE as f32).ceil() as u32,
+                (tiled_map.height as f32 / CHUNK_SIZE as f32).ceil() as u32
+            ),
+            ChunkSize(CHUNK_SIZE, CHUNK_SIZE),
+            TileSize(tileset.tile_width as f32, tileset.tile_height as f32),
+            // TODO: don't unwrap this
+            TextureSize(
+                tileset.image.clone().unwrap().width as f32,
+                tileset.image.clone().unwrap().height as f32,
+            ),
+        );
+        layer_settings.grid_size =
+            Vec2::new(tiled_map.tile_width as f32, tiled_map.tile_height as f32);
+            layer_settings.mesh_type = TilemapMeshType::Square;
+
+        let layer_type = layer.layer_type();
+        let tile_layer = match layer_type {
+            tiled::LayerType::TileLayer(layer) => match layer {
+                tiled::TileLayer::Finite(data) => data,
+                tiled::TileLayer::Infinite(_) => {
+                    panic!("infinite tilemaps not supported");
+                }
+            },
+            tiled::LayerType::ObjectLayer(_) => {
+                panic!("object layers not supported yet")
+            }
+            tiled::LayerType::ImageLayer(_) => {
+                panic!("image layers not supported yet")
+            }
+            tiled::LayerType::GroupLayer(_) => {
+                panic!("image layers not supported yet")
+            }
+        };
+
+
+        let layer_entity = LayerBuilder::<TileBundle>::new_batch(
+            commands,
+            layer_settings.clone(),
+            meshes,
+            texture_handle.clone(),
+            0u16,
+            layer.id() as u16,
+            |mut tile_pos| {
+                if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
+                    return None;
+                }
+
+                if tiled_map.orientation == tiled::Orientation::Orthogonal {
+                    tile_pos.1 = (tiled_map.height - 1) as u32 - tile_pos.1;
+                }
+
+                let tile = &tile_layer
+                    .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
+                    .unwrap();
+
+                let tile = Tile {
+                    texture_index: tile.id() as u16,
+                    flip_x: tile.flip_h,
+                    flip_y: tile.flip_v,
+                    flip_d: tile.flip_d,
+                    ..Default::default()
+                };
+
+                Some(TileBundle {
+                    tile,
+                    ..Default::default()
+                })
+            },
+        );
+
+        ecs_map.add_layer(commands, layer.id() as u16, layer_entity);
+        commands.entity(layer_entity).insert(Transform::from_xyz(
+            layer.offset_y,
+            -layer.offset_x,
+            layer.id() as f32,
+        ));
+    }
+}
+
 /// Spawn entities in response to spawn events
 fn spawn(
     mut spawn_events: EventReader<TilemapSpawnEvent>,
@@ -73,107 +168,24 @@ fn spawn(
         let mut loader = Loader::new();
         let tiled_map = loader.load_tmx_map(spawn_event.path).unwrap();
 
-        let width = tiled_map.width;
-        let height = tiled_map.height;
-        let orientation = tiled_map.orientation;
-        let tile_width = tiled_map.tile_width;
-        let tile_height = tiled_map.tile_height;
-
         let map_entity = commands.spawn().id();
         let mut ecs_map = bevy_ecs_tilemap::Map::new(0u16, map_entity);
 
-        for tileset in tiled_map.tilesets() {
-            // TODO: make this handle multiple textures
-            let texture_handle =
-                load_texture_atlas(&tileset, &asset_server).unwrap();
+        let tileset = tiled_map.tilesets().first().unwrap();
+        // TODO: make this handle multiple textures
+        let texture_handle =
+            load_texture_atlas(&tileset, &asset_server).unwrap();
 
-            // TODO: take this out of this loop
-            for layer in tiled_map.layers() {
-                info!("loading layer {:?}", layer.id());
-                if layer.visible {
-                    info!("layer {:?} is visible", layer.id());
-                    const CHUNK_SIZE: u32 = 256;
-
-                    let mut layer_settings = LayerSettings::new(
-                        MapSize(
-                            (width as f32 / CHUNK_SIZE as f32).ceil() as u32,
-                            (height as f32 / CHUNK_SIZE as f32).ceil() as u32
-                        ),
-                        ChunkSize(CHUNK_SIZE, CHUNK_SIZE),
-                        TileSize(tileset.tile_width as f32, tileset.tile_height as f32),
-                        // TODO: don't unwrap this
-                        TextureSize(
-                            tileset.image.clone().unwrap().width as f32,
-                            tileset.image.clone().unwrap().height as f32,
-                        ),
-                    );
-                    layer_settings.grid_size =
-                        Vec2::new(tile_width as f32, tile_height as f32);
-                        layer_settings.mesh_type = TilemapMeshType::Square;
-
-                    let layer_type = layer.layer_type();
-                    let tile_layer = match layer_type {
-                        tiled::LayerType::TileLayer(layer) => match layer {
-                            tiled::TileLayer::Finite(data) => data,
-                            tiled::TileLayer::Infinite(_) => {
-                                panic!("infinite tilemaps not supported");
-                            }
-                        },
-                        tiled::LayerType::ObjectLayer(_) => {
-                            panic!("object layers not supported yet")
-                        }
-                        tiled::LayerType::ImageLayer(_) => {
-                            panic!("image layers not supported yet")
-                        }
-                        tiled::LayerType::GroupLayer(_) => {
-                            panic!("image layers not supported yet")
-                        }
-                    };
-
-
-                    let layer_entity = LayerBuilder::<TileBundle>::new_batch(
-                        &mut commands,
-                        layer_settings.clone(),
-                        &mut meshes,
-                        texture_handle.clone(),
-                        0u16,
-                        layer.id() as u16,
-                        |mut tile_pos| {
-                            if tile_pos.0 >= width || tile_pos.1 >= height {
-                                return None;
-                            }
-
-                            if orientation == tiled::Orientation::Orthogonal {
-                                tile_pos.1 = (height - 1) as u32 - tile_pos.1;
-                            }
-
-                            let tile = &tile_layer
-                                .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
-                                .unwrap();
-
-                            let tile = Tile {
-                                texture_index: tile.id() as u16,
-                                flip_x: tile.flip_h,
-                                flip_y: tile.flip_v,
-                                flip_d: tile.flip_d,
-                                ..Default::default()
-                            };
-
-                            Some(TileBundle {
-                                tile,
-                                ..Default::default()
-                            })
-                        },
-                    );
-
-                    ecs_map.add_layer(&mut commands, layer.id() as u16, layer_entity);
-                    commands.entity(layer_entity).insert(Transform::from_xyz(
-                        layer.offset_y,
-                        -layer.offset_x,
-                        layer.id() as f32,
-                    ));
-                }
-            }
+        for layer in tiled_map.layers() {
+            process_layer(
+                &mut commands,
+                &mut meshes,
+                &layer,
+                &tileset,
+                &texture_handle,
+                &tiled_map,
+                &mut ecs_map
+            );
         }
         commands.spawn_bundle(TiledMapBundle {
             ecs_map,
