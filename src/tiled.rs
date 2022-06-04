@@ -1,17 +1,20 @@
 use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
+use bevy_rapier2d::prelude::*;
+use nalgebra::Isometry2;
 use std::{path::Path, sync::Arc};
 
-use tiled::{Tileset, Loader};
+use tiled::{Loader, ObjectShape, Tileset};
 
 pub struct TiledPlugin;
 
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<TilemapSpawnEvent>()
+        app.add_event::<TilemapSpawnEvent>()
             .add_system(spawn)
-            .add_system(set_texture_filters_to_nearest);
+            .add_system(set_texture_filters_to_nearest)
+            .add_system(process_object_layers)
+            .add_system(add_colliders);
     }
 }
 
@@ -48,11 +51,7 @@ pub fn set_texture_filters_to_nearest(
     }
 }
 
-
-fn load_texture_atlas(
-    tileset: &Tileset,
-    asset_server: &Res<AssetServer>
-) -> Option<Handle<Image>> {
+fn load_texture_atlas(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
     if let Some(image) = &tileset.image {
         let path = std::fs::canonicalize(&image.source).unwrap();
         info!("loading texture: {path:?}");
@@ -69,7 +68,7 @@ fn process_layer(
     tileset: &Arc<Tileset>,
     texture_handle: &Handle<Image>,
     tiled_map: &tiled::Map,
-    ecs_map: &mut bevy_ecs_tilemap::Map
+    ecs_map: &mut bevy_ecs_tilemap::Map,
 ) {
     info!("loading layer {:?}", layer.id());
     if layer.visible {
@@ -79,7 +78,7 @@ fn process_layer(
         let mut layer_settings = LayerSettings::new(
             MapSize(
                 (tiled_map.width as f32 / CHUNK_SIZE as f32).ceil() as u32,
-                (tiled_map.height as f32 / CHUNK_SIZE as f32).ceil() as u32
+                (tiled_map.height as f32 / CHUNK_SIZE as f32).ceil() as u32,
             ),
             ChunkSize(CHUNK_SIZE, CHUNK_SIZE),
             TileSize(tileset.tile_width as f32, tileset.tile_height as f32),
@@ -91,7 +90,7 @@ fn process_layer(
         );
         layer_settings.grid_size =
             Vec2::new(tiled_map.tile_width as f32, tiled_map.tile_height as f32);
-            layer_settings.mesh_type = TilemapMeshType::Square;
+        layer_settings.mesh_type = TilemapMeshType::Square;
 
         let layer_type = layer.layer_type();
         let tile_layer = match layer_type {
@@ -111,7 +110,6 @@ fn process_layer(
                 panic!("image layers not supported yet")
             }
         };
-
 
         let layer_entity = LayerBuilder::<TileBundle>::new_batch(
             commands,
@@ -162,7 +160,7 @@ fn spawn(
     mut spawn_events: EventReader<TilemapSpawnEvent>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for spawn_event in spawn_events.iter() {
         let mut loader = Loader::new();
@@ -173,8 +171,7 @@ fn spawn(
 
         let tileset = tiled_map.tilesets().first().unwrap();
         // TODO: make this handle multiple textures
-        let texture_handle =
-            load_texture_atlas(&tileset, &asset_server).unwrap();
+        let texture_handle = load_texture_atlas(&tileset, &asset_server).unwrap();
 
         for layer in tiled_map.layers() {
             process_layer(
@@ -184,27 +181,104 @@ fn spawn(
                 &tileset,
                 &texture_handle,
                 &tiled_map,
-                &mut ecs_map
+                &mut ecs_map,
             );
         }
         commands.spawn_bundle(TiledMapBundle {
             ecs_map,
             tiled_map: TiledMapComponent(tiled_map),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0)
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
         });
     }
 }
 
-// fn load_tilemap_colliders(
-//     mut commands: Commands,
-//     mut tile_query: Query<&mut Tile>,
-//     mut map_query: MapQuery
-// ) {
-//     for x in 0..0 {
-//         for y in 0..0 {
-//             if let Ok(tile) = map_query.get_tile_entity(pos, 016, 1) {
-                
-//             }
-//         }
-//     }
-// }
+fn process_object_layers(
+    tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
+) {
+    for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
+        if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
+            return match layer.layer_type() {
+                tiled::LayerType::ObjectLayer(object_layer) => Some(object_layer),
+                _ => None,
+            };
+        }) {
+            info!("Found object layer");
+            for object in object_layer.objects() {
+                if object.obj_type.as_str() == "wall" {
+                    if let ObjectShape::Rect { width, height } = object.shape {
+                        info!("Found rect of {width}, {height}");
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn add_colliders(
+    rc: Res<RapierConfiguration>,
+    mut commands: Commands,
+    mut tile_query: Query<&mut Tile>,
+    mut map_query: MapQuery,
+    tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
+) {
+    for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
+        let mut collider_spawners = std::collections::HashMap::new();
+        if let Some(tileset) = tiled_map.tilesets().first() {
+            for (id, tile) in tileset.tiles() {
+                if let Some(object_layer_data) = &tile.collision {
+                    let object_layer_data = object_layer_data.clone();
+                    let physics_scale = rc.scale;
+                    collider_spawners.insert(id, move |commands: &mut Commands| -> Vec<Entity> {
+                        object_layer_data
+                            .object_data()
+                            .iter()
+                            .filter_map(|object| {
+                                match object.shape {
+                                    ObjectShape::Rect { width, height } => {
+                                        let physics_width = width / physics_scale;
+                                        let physics_height = height / physics_scale;
+                                        // TODO: are these offsets?
+                                        let physics_x = object.x / physics_scale;
+                                        let physics_y = object.y / physics_scale;
+                                        Some(
+                                            commands
+                                                .spawn_bundle(ColliderBundle {
+                                                    shape: ColliderShape::cuboid(
+                                                        physics_width,
+                                                        physics_height,
+                                                    )
+                                                    .into(),
+                                                    position: Isometry2::new(
+                                                        [physics_x, physics_y].into(),
+                                                        0.0,
+                                                    )
+                                                    .into(),
+                                                    ..Default::default()
+                                                })
+                                                .id(),
+                                        )
+                                    }
+                                    _ => None,
+                                }
+                            })
+                            .collect()
+                    });
+                }
+            }
+        }
+
+        for x in 0..tiled_map.width {
+            for y in 0..tiled_map.height {
+                if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), 016, 1) {
+                    if let Ok(tile) = tile_query.get_mut(tile_entity) {
+                        let object_entities =
+                            collider_spawners[&(tile.texture_index as u32)](&mut commands);
+                        commands
+                            .entity(tile_entity)
+                            .insert_children(0, object_entities.as_slice());
+                    }
+                }
+            }
+        }
+    }
+}
