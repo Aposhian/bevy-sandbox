@@ -6,6 +6,9 @@ use std::{path::Path, sync::Arc};
 
 use tiled::{Loader, ObjectShape, Tileset};
 
+// TODO: change this from a constant so we can handle multiple maps
+const MAP_ID: u16 = 0u16;
+
 pub struct TiledPlugin;
 
 impl Plugin for TiledPlugin {
@@ -116,7 +119,7 @@ fn process_layer(
             layer_settings.clone(),
             meshes,
             texture_handle.clone(),
-            0u16,
+            MAP_ID,
             layer.id() as u16,
             |mut tile_pos| {
                 if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
@@ -167,7 +170,7 @@ fn spawn(
         let tiled_map = loader.load_tmx_map(spawn_event.path).unwrap();
 
         let map_entity = commands.spawn().id();
-        let mut ecs_map = bevy_ecs_tilemap::Map::new(0u16, map_entity);
+        let mut ecs_map = bevy_ecs_tilemap::Map::new(MAP_ID, map_entity);
 
         let tileset = tiled_map.tilesets().first().unwrap();
         // TODO: make this handle multiple textures
@@ -217,7 +220,7 @@ fn process_object_layers(
 fn add_colliders(
     rc: Res<RapierConfiguration>,
     mut commands: Commands,
-    mut tile_query: Query<&mut Tile>,
+    tile_query: Query<&Tile>,
     mut map_query: MapQuery,
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
 ) {
@@ -269,13 +272,15 @@ fn add_colliders(
 
         for x in 0..tiled_map.width {
             for y in 0..tiled_map.height {
-                if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), 016, 1) {
-                    if let Ok(tile) = tile_query.get_mut(tile_entity) {
-                        let object_entities =
-                            collider_spawners[&(tile.texture_index as u32)](&mut commands);
-                        commands
-                            .entity(tile_entity)
-                            .insert_children(0, object_entities.as_slice());
+                if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), MAP_ID, 1) {
+                    if let Ok(tile) = tile_query.get(tile_entity) {
+                        if let Some(spawner) = collider_spawners.get(&(tile.texture_index as u32)) {
+                            info!("Spawning objects at ({x}, {y})");
+                            let object_entities = spawner(&mut commands);
+                            commands
+                                .entity(tile_entity)
+                                .push_children(object_entities.as_slice());
+                        }
                     }
                 }
             }
