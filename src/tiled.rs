@@ -14,6 +14,7 @@ pub struct TiledPlugin;
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TilemapSpawnEvent>()
+            .add_plugin(RapierRenderPlugin)
             .add_system(spawn)
             .add_system(set_texture_filters_to_nearest)
             .add_system(process_object_layers)
@@ -231,7 +232,7 @@ fn add_colliders(
                 if let Some(object_layer_data) = &tile.collision {
                     let object_layer_data = object_layer_data.clone();
                     let physics_scale = rc.scale;
-                    collider_spawners.insert(id, move |commands: &mut Commands| -> Vec<Entity> {
+                    collider_spawners.insert(id, move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
                         object_layer_data
                             .object_data()
                             .iter()
@@ -240,25 +241,31 @@ fn add_colliders(
                                     ObjectShape::Rect { width, height } => {
                                         let physics_width = width / physics_scale;
                                         let physics_height = height / physics_scale;
-                                        // TODO: are these offsets?
-                                        let physics_x = object.x / physics_scale;
-                                        let physics_y = object.y / physics_scale;
+
+                                        let x = (column * tiled_map.tile_width) as f32 / physics_scale;
+                                        let y = (row * tiled_map.tile_height) as f32 / physics_scale;
+                                        let x_offset = object.x / physics_scale;
+                                        let y_offset = object.y / physics_scale;
+                                        info!("spawning a collider");
                                         Some(
                                             commands
                                                 .spawn_bundle(ColliderBundle {
                                                     shape: ColliderShape::cuboid(
-                                                        physics_width,
-                                                        physics_height,
+                                                        // physics_width / 2.0,
+                                                        // physics_height / 2.0,
+                                                        1.0, 1.0
                                                     )
                                                     .into(),
                                                     position: Isometry2::new(
-                                                        [physics_x, physics_y].into(),
+                                                        [x + x_offset, y + y_offset - 3.0].into(),
                                                         0.0,
                                                     )
                                                     .into(),
                                                     ..Default::default()
                                                 })
-                                                .id(),
+                                                .insert(ColliderDebugRender::with_id(2))
+                                                .insert(ColliderPositionSync::Discrete)
+                                                .id()
                                         )
                                     }
                                     _ => None,
@@ -270,16 +277,15 @@ fn add_colliders(
             }
         }
 
-        for x in 0..tiled_map.width {
-            for y in 0..tiled_map.height {
+        for x in 3..4 {
+            for y in 0..1 {
                 if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), MAP_ID, 1) {
                     if let Ok(tile) = tile_query.get(tile_entity) {
                         if let Some(spawner) = collider_spawners.get(&(tile.texture_index as u32)) {
-                            info!("Spawning objects at ({x}, {y})");
-                            let object_entities = spawner(&mut commands);
-                            commands
-                                .entity(tile_entity)
-                                .push_children(object_entities.as_slice());
+                            let object_entities = spawner(&mut commands, x, y);
+                            // commands
+                            //     .entity(tile_entity)
+                            //     .push_children(object_entities.as_slice());
                         }
                     }
                 }
