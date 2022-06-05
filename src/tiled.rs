@@ -14,7 +14,7 @@ pub struct TiledPlugin;
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TilemapSpawnEvent>()
-            // .add_plugin(RapierRenderPlugin)
+            .add_plugin(RapierRenderPlugin)
             .add_system(spawn)
             .add_system(set_texture_filters_to_nearest)
             .add_system(process_object_layers)
@@ -59,7 +59,7 @@ fn load_texture_atlas(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Opt
     if let Some(image) = &tileset.image {
         let path = std::fs::canonicalize(&image.source).unwrap();
         info!("loading texture: {path:?}");
-        let texture_handle = asset_server.load(path);
+        let texture_handle = asset_server.load("assets/spritesheets/baseball.png");
         return Some(texture_handle);
     }
     None
@@ -98,20 +98,14 @@ fn process_layer(
 
         let layer_type = layer.layer_type();
         let tile_layer = match layer_type {
-            tiled::LayerType::TileLayer(layer) => match layer {
+            tiled::LayerType::Tiles(layer) => match layer {
                 tiled::TileLayer::Finite(data) => data,
                 tiled::TileLayer::Infinite(_) => {
                     panic!("infinite tilemaps not supported");
                 }
             },
-            tiled::LayerType::ObjectLayer(_) => {
-                panic!("object layers not supported yet")
-            }
-            tiled::LayerType::ImageLayer(_) => {
-                panic!("image layers not supported yet")
-            }
-            tiled::LayerType::GroupLayer(_) => {
-                panic!("image layers not supported yet")
+            _ => {
+                panic!("Unsupported layer type: {:?}", layer_type);
             }
         };
 
@@ -200,7 +194,7 @@ fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<Tile
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
             return match layer.layer_type() {
-                tiled::LayerType::ObjectLayer(object_layer) => Some(object_layer),
+                tiled::LayerType::Objects(object_layer) => Some(object_layer),
                 _ => None,
             };
         }) {
@@ -229,6 +223,10 @@ fn add_colliders(
             for (id, tile) in tileset.tiles() {
                 if let Some(object_layer_data) = &tile.collision {
                     let object_layer_data = object_layer_data.clone();
+                    info!("tile id {id} has {} objects", object_layer_data.object_data().len());
+                    for object in object_layer_data.object_data() {
+                        info!("object: {:?}", object);
+                    }
                     let physics_scale = rc.scale;
                     collider_spawners.insert(
                         id,
@@ -237,20 +235,19 @@ fn add_colliders(
                                 .object_data()
                                 .iter()
                                 .filter_map(|object| {
-                                    match object.shape {
+                                    let physics_tile_width = tiled_map.tile_width as f32 / physics_scale;
+                                    let physics_tile_height = tiled_map.tile_height as f32 / physics_scale;
+
+                                    let x = (column * tiled_map.tile_width) as f32
+                                        / physics_scale;
+                                    let y = (row * tiled_map.tile_height) as f32
+                                        / physics_scale;
+                                    let x_offset = object.x / physics_scale;
+                                    let y_offset = object.y / physics_scale;
+                                    match &object.shape {
                                         ObjectShape::Rect { width, height } => {
                                             let physics_width = width / physics_scale;
                                             let physics_height = height / physics_scale;
-
-                                            let physics_tile_width = tiled_map.tile_width as f32 / physics_scale;
-                                            let physics_tile_height = tiled_map.tile_height as f32 / physics_scale;
-
-                                            let x = (column * tiled_map.tile_width) as f32
-                                                / physics_scale;
-                                            let y = (row * tiled_map.tile_height) as f32
-                                                / physics_scale;
-                                            let x_offset = object.x / physics_scale;
-                                            let y_offset = object.y / physics_scale;
                                             Some(
                                                 commands
                                                     .spawn_bundle(RigidBodyBundle {
@@ -276,13 +273,49 @@ fn add_colliders(
                                                     .insert(ColliderPositionSync::Discrete)
                                                     .id(),
                                             )
-                                        }
-                                        _ => None,
+                                        },
+                                        ObjectShape::Polygon { points} => {
+                                            let mut vertices = Vec::with_capacity(points.len());
+                                            for (x, y) in points {
+                                                vertices.push(Point::<Real>::new(*x, *y));
+                                            }
+                                            Some(
+                                                commands
+                                                    .spawn_bundle(RigidBodyBundle {
+                                                        body_type: RigidBodyTypeComponent(
+                                                            RigidBodyType::Static,
+                                                        ),
+                                                        position: Isometry2::new(
+                                                            [x + x_offset + physics_tile_width / 2.0, y + y_offset + physics_tile_height / 2.0]
+                                                                .into(),
+                                                            0.0,
+                                                        ).into(),
+                                                        ..Default::default()
+                                                    })
+                                                    .insert_bundle(ColliderBundle {
+                                                        shape: ColliderShape::polyline(
+                                                            vertices,
+                                                            None
+                                                        )
+                                                        .into(),
+                                                        ..Default::default()
+                                                    })
+                                                    .insert(ColliderDebugRender::with_id(2))
+                                                    .insert(ColliderPositionSync::Discrete)
+                                                    .id(),
+                                            )
+                                        },
+                                        _ => {
+                                            warn!("Unsupported object shape: {:?}", object.shape);
+                                            None
+                                        },
                                     }
                                 })
                                 .collect()
                         },
                     );
+                } else {
+                    warn!("No collision data for tile id: {id}");
                 }
             }
         }

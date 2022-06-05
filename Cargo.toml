@@ -14,5 +14,5 @@ serde_json = "^1.0"
 pathfinding = "^2.2"
 bevy_prototype_lyon = "^0.4"
 lyon_tessellation = "0.17.10"
-tiled = "0.10"
+tiled = { git = "https://github.com/aposhian/rs-tiled.git", branch = "fix-templates" }
 bevy_ecs_tilemap = "0.5"
