@@ -210,6 +210,14 @@ fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<Tile
     }
 }
 
+#[derive(Bundle)]
+pub struct WallColliderBundle {
+    #[bundle]
+    rigid_body_bundle: RigidBodyBundle,
+    #[bundle]
+    collider_bundle: ColliderBundle,
+}
+
 fn add_colliders(
     rc: Res<RapierConfiguration>,
     mut commands: Commands,
@@ -223,7 +231,10 @@ fn add_colliders(
             for (id, tile) in tileset.tiles() {
                 if let Some(object_layer_data) = &tile.collision {
                     let object_layer_data = object_layer_data.clone();
-                    info!("tile id {id} has {} objects", object_layer_data.object_data().len());
+                    info!(
+                        "tile id {id} has {} objects",
+                        object_layer_data.object_data().len()
+                    );
                     for object in object_layer_data.object_data() {
                         info!("object: {:?}", object);
                     }
@@ -235,13 +246,13 @@ fn add_colliders(
                                 .object_data()
                                 .iter()
                                 .filter_map(|object| {
-                                    let physics_tile_width = tiled_map.tile_width as f32 / physics_scale;
-                                    let physics_tile_height = tiled_map.tile_height as f32 / physics_scale;
+                                    let physics_tile_width =
+                                        tiled_map.tile_width as f32 / physics_scale;
+                                    let physics_tile_height =
+                                        tiled_map.tile_height as f32 / physics_scale;
 
-                                    let x = (column * tiled_map.tile_width) as f32
-                                        / physics_scale;
-                                    let y = (row * tiled_map.tile_height) as f32
-                                        / physics_scale;
+                                    let x = (column * tiled_map.tile_width) as f32 / physics_scale;
+                                    let y = (row * tiled_map.tile_height) as f32 / physics_scale;
                                     let x_offset = object.x / physics_scale;
                                     let y_offset = object.y / physics_scale;
                                     match &object.shape {
@@ -250,31 +261,40 @@ fn add_colliders(
                                             let physics_height = height / physics_scale;
                                             Some(
                                                 commands
-                                                    .spawn_bundle(RigidBodyBundle {
-                                                        body_type: RigidBodyTypeComponent(
-                                                            RigidBodyType::Static,
-                                                        ),
-                                                        position: Isometry2::new(
-                                                            [x + x_offset + physics_tile_width / 2.0, y + y_offset + physics_tile_height / 2.0]
-                                                                .into(),
-                                                            object.rotation.to_radians(),
-                                                        ).into(),
-                                                        ..Default::default()
+                                                    .spawn_bundle(WallColliderBundle {
+                                                        rigid_body_bundle: RigidBodyBundle {
+                                                            body_type: RigidBodyTypeComponent(
+                                                                RigidBodyType::Static,
+                                                            ),
+                                                            position: Isometry2::new(
+                                                                [x, y].into(),
+                                                                object.rotation.to_radians(),
+                                                            )
+                                                            .into(),
+                                                            ..Default::default()
+                                                        },
+                                                        collider_bundle: ColliderBundle {
+                                                            shape: ColliderShape::cuboid(
+                                                                physics_width / 2.0,
+                                                                physics_height / 2.0,
+                                                            )
+                                                            .into(),
+                                                            position: Isometry2::new(
+                                                                [x_offset, y_offset].into(),
+                                                                0.0,
+                                                            )
+                                                            .into(),
+                                                            ..Default::default()
+                                                        },
                                                     })
-                                                    .insert_bundle(ColliderBundle {
-                                                        shape: ColliderShape::cuboid(
-                                                            physics_width / 2.0,
-                                                            physics_height / 2.0,
-                                                        )
-                                                        .into(),
-                                                        ..Default::default()
-                                                    })
-                                                    .insert(ColliderDebugRender::with_id(id as usize))
+                                                    .insert(ColliderDebugRender::with_id(
+                                                        id as usize,
+                                                    ))
                                                     .insert(ColliderPositionSync::Discrete)
                                                     .id(),
                                             )
-                                        },
-                                        ObjectShape::Polygon { points} => {
+                                        }
+                                        ObjectShape::Polygon { points } => {
                                             let mut vertices = Vec::with_capacity(points.len());
                                             for (x, y) in points {
                                                 vertices.push(Point::<Real>::new(*x, *y));
@@ -286,29 +306,36 @@ fn add_colliders(
                                                             RigidBodyType::Static,
                                                         ),
                                                         position: Isometry2::new(
-                                                            [x + x_offset + physics_tile_width / 2.0, y + y_offset + physics_tile_height / 2.0]
-                                                                .into(),
+                                                            [
+                                                                x + x_offset
+                                                                    + physics_tile_width / 2.0,
+                                                                y + y_offset
+                                                                    + physics_tile_height / 2.0,
+                                                            ]
+                                                            .into(),
                                                             0.0,
-                                                        ).into(),
-                                                        ..Default::default()
-                                                    })
-                                                    .insert_bundle(ColliderBundle {
-                                                        shape: ColliderShape::polyline(
-                                                            vertices,
-                                                            None
                                                         )
                                                         .into(),
                                                         ..Default::default()
                                                     })
-                                                    .insert(ColliderDebugRender::with_id(id as usize))
+                                                    .insert_bundle(ColliderBundle {
+                                                        shape: ColliderShape::polyline(
+                                                            vertices, None,
+                                                        )
+                                                        .into(),
+                                                        ..Default::default()
+                                                    })
+                                                    .insert(ColliderDebugRender::with_id(
+                                                        id as usize,
+                                                    ))
                                                     .insert(ColliderPositionSync::Discrete)
                                                     .id(),
                                             )
-                                        },
+                                        }
                                         _ => {
                                             warn!("Unsupported object shape: {:?}", object.shape);
                                             None
-                                        },
+                                        }
                                     }
                                 })
                                 .collect()
