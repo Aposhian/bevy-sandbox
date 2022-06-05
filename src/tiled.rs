@@ -199,6 +199,7 @@ fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<Tile
                 _ => None,
             };
         }) {
+            // TODO: flesh this out when actually using object layers
             info!("Found object layer");
             for object in object_layer.objects() {
                 if object.obj_type.as_str() == "wall" {
@@ -235,14 +236,8 @@ fn add_colliders(
         if let Some(tileset) = tiled_map.tilesets().first() {
             for (id, tile) in tileset.tiles() {
                 if let Some(object_layer_data) = &tile.collision {
+                    // Clone these so we can just move them into the closure
                     let object_layer_data = object_layer_data.clone();
-                    info!(
-                        "tile id {id} has {} objects",
-                        object_layer_data.object_data().len()
-                    );
-                    for object in object_layer_data.object_data() {
-                        info!("object: {:?}", object);
-                    }
                     let physics_scale = rc.scale;
                     collider_spawners.insert(
                         id,
@@ -262,6 +257,9 @@ fn add_colliders(
                                         ObjectShape::Rect { width, height } => {
                                             let physics_width = width / physics_scale;
                                             let physics_height = height / physics_scale;
+                                            // The collider position is measured from the center in rapier,
+                                            // but in tiled it is from the top-left corner.
+                                            // In rapier2d, y increases up, but in tiled, y increases down
                                             let mut collider_position = Isometry2::new(
                                                 [
                                                     physics_width / 2.0 + x_offset,
@@ -270,9 +268,14 @@ fn add_colliders(
                                                 .into(),
                                                 0.0,
                                             );
+                                            // Tiled rotates about the top-left corner
+                                            let clockwise_rotation = object.rotation.to_radians();
+                                            let counterclockwise_rotation = TAU - clockwise_rotation;
+
+                                            // This needs to rotate about the top-left corner
                                             collider_position.append_rotation_wrt_point_mut(
                                                 &UnitComplex::new(
-                                                    TAU - object.rotation.to_radians(),
+                                                    counterclockwise_rotation,
                                                 ),
                                                 &Point::new(x_offset, -y_offset),
                                             );
@@ -283,6 +286,7 @@ fn add_colliders(
                                                             body_type: RigidBodyTypeComponent(
                                                                 RigidBodyType::Static,
                                                             ),
+                                                            // Use top-left corner instead of bottom-left corner
                                                             position: Isometry2::new(
                                                                 [x, y + physics_tile_height].into(),
                                                                 0.0,
@@ -291,6 +295,7 @@ fn add_colliders(
                                                             ..Default::default()
                                                         },
                                                         collider_bundle: ColliderBundle {
+                                                            // Convert dimensions into half-extants
                                                             shape: ColliderShape::cuboid(
                                                                 physics_width / 2.0,
                                                                 physics_height / 2.0,
