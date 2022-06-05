@@ -8,7 +8,9 @@
  </tile>
  <tile id="1">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="right_elbow.tx" x="32" y="32" rotation="180"/>
+   <object id="2" template="corner.tx" x="0" y="16"/>
+   <object id="3" template="corner.tx" x="0" y="0"/>
+   <object id="4" template="corner.tx" x="16" y="0"/>
   </objectgroup>
  </tile>
  <tile id="2">
@@ -18,7 +20,9 @@
  </tile>
  <tile id="3">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="left_elbow.tx" x="32" y="32" rotation="180"/>
+   <object id="1" template="corner.tx" x="0" y="0"/>
+   <object id="2" template="corner.tx" x="16" y="0"/>
+   <object id="3" template="corner.tx" x="16" y="16"/>
   </objectgroup>
  </tile>
  <tile id="4">
@@ -65,7 +69,9 @@
  </tile>
  <tile id="13">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="left_elbow.tx" x="0" y="0"/>
+   <object id="2" template="corner.tx" x="0" y="0"/>
+   <object id="3" template="corner.tx" x="0" y="16"/>
+   <object id="4" template="corner.tx" x="16" y="16"/>
   </objectgroup>
  </tile>
  <tile id="14">
@@ -75,7 +81,9 @@
  </tile>
  <tile id="15">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="right_elbow.tx" x="0" y="0"/>
+   <object id="2" template="corner.tx" x="16" y="0"/>
+   <object id="3" template="corner.tx" x="16" y="16"/>
+   <object id="4" template="corner.tx" x="0" y="16"/>
   </objectgroup>
  </tile>
  <wangsets>

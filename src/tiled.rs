@@ -251,8 +251,6 @@ fn add_colliders(
                                 .object_data()
                                 .iter()
                                 .filter_map(|object| {
-                                    let physics_tile_width =
-                                        tiled_map.tile_width as f32 / physics_scale;
                                     let physics_tile_height =
                                         tiled_map.tile_height as f32 / physics_scale;
 
@@ -310,56 +308,6 @@ fn add_colliders(
                                                     .id(),
                                             )
                                         }
-                                        // ObjectShape::Polygon { points } => {
-                                        //     let mut vertices = Vec::with_capacity(points.len());
-                                        //     for (x, y) in points {
-                                        //         vertices.push(Point::<Real>::new(*x, *y));
-                                        //     }
-                                        //     let mut collider_position =
-                                        //         Isometry2::new([x_offset, y_offset].into(), 0.0);
-                                        //     collider_position.append_rotation_wrt_point_mut(
-                                        //         &UnitComplex::new(
-                                        //             TAU - object.rotation.to_radians(),
-                                        //         ),
-                                        //         &Point::new(x_offset, -y_offset),
-                                        //     );
-                                        //     Some(
-                                        //         commands
-                                        //             .spawn_bundle(WallColliderBundle {
-                                        //                 rigid_body_bundle: RigidBodyBundle {
-                                        //                     body_type: RigidBodyTypeComponent(
-                                        //                         RigidBodyType::Static,
-                                        //                     ),
-                                        //                     position: Isometry2::new(
-                                        //                         [
-                                        //                             x + x_offset
-                                        //                                 + physics_tile_width / 2.0,
-                                        //                             y + y_offset
-                                        //                                 + physics_tile_height / 2.0,
-                                        //                         ]
-                                        //                         .into(),
-                                        //                         0.0,
-                                        //                     )
-                                        //                     .into(),
-                                        //                     ..Default::default()
-                                        //                 },
-                                        //                 collider_bundle: ColliderBundle {
-                                        //                     shape: ColliderShape::polyline(
-                                        //                         vertices, None,
-                                        //                     )
-                                        //                     .into(),
-                                        //                     position: collider_position.into(),
-                                        //                     ..Default::default()
-                                        //                 },
-                                        //                 ..Default::default()
-                                        //             })
-                                        //             .insert(ColliderDebugRender::with_id(
-                                        //                 id as usize,
-                                        //             ))
-                                        //             .insert(ColliderPositionSync::Discrete)
-                                        //             .id(),
-                                        //     )
-                                        // }
                                         _ => {
                                             warn!("Unsupported object shape: {:?}", object.shape);
                                             None
