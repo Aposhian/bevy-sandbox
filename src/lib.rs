@@ -23,7 +23,6 @@ use camera::CameraPlugin;
 use ecs::DespawnPlugin;
 use health::HealthPlugin;
 use input::InputPlugin;
-use obstacle::ObstaclePlugin;
 use pathfollowing::PathfollowingPlugin;
 use simple_figure::SimpleFigurePlugin;
 pub struct SandboxPlugins;
