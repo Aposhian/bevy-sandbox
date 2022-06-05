@@ -269,7 +269,7 @@ fn add_colliders(
                                                         .into(),
                                                         ..Default::default()
                                                     })
-                                                    .insert(ColliderDebugRender::with_id(2))
+                                                    .insert(ColliderDebugRender::with_id(id as usize))
                                                     .insert(ColliderPositionSync::Discrete)
                                                     .id(),
                                             )
@@ -300,7 +300,7 @@ fn add_colliders(
                                                         .into(),
                                                         ..Default::default()
                                                     })
-                                                    .insert(ColliderDebugRender::with_id(2))
+                                                    .insert(ColliderDebugRender::with_id(id as usize))
                                                     .insert(ColliderPositionSync::Discrete)
                                                     .id(),
                                             )
