@@ -15,7 +15,7 @@ pub struct TiledPlugin;
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TilemapSpawnEvent>()
-            .add_plugin(RapierRenderPlugin)
+            // .add_plugin(RapierRenderPlugin)
             .add_system(spawn)
             .add_system(set_texture_filters_to_nearest)
             .add_system(process_object_layers)
@@ -60,7 +60,7 @@ fn load_texture_atlas(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Opt
     if let Some(image) = &tileset.image {
         let path = std::fs::canonicalize(&image.source).unwrap();
         info!("loading texture: {path:?}");
-        let texture_handle = asset_server.load("assets/spritesheets/baseball.png");
+        let texture_handle = asset_server.load(path);
         return Some(texture_handle);
     }
     None
@@ -286,7 +286,7 @@ fn add_colliders(
                                                                 RigidBodyType::Static,
                                                             ),
                                                             position: Isometry2::new(
-                                                                [x, y].into(),
+                                                                [x, y + physics_tile_height].into(),
                                                                 0.0,
                                                             )
                                                             .into(),
@@ -310,56 +310,56 @@ fn add_colliders(
                                                     .id(),
                                             )
                                         }
-                                        ObjectShape::Polygon { points } => {
-                                            let mut vertices = Vec::with_capacity(points.len());
-                                            for (x, y) in points {
-                                                vertices.push(Point::<Real>::new(*x, *y));
-                                            }
-                                            let mut collider_position =
-                                                Isometry2::new([x_offset, y_offset].into(), 0.0);
-                                            collider_position.append_rotation_wrt_point_mut(
-                                                &UnitComplex::new(
-                                                    TAU - object.rotation.to_radians(),
-                                                ),
-                                                &Point::new(x_offset, -y_offset),
-                                            );
-                                            Some(
-                                                commands
-                                                    .spawn_bundle(WallColliderBundle {
-                                                        rigid_body_bundle: RigidBodyBundle {
-                                                            body_type: RigidBodyTypeComponent(
-                                                                RigidBodyType::Static,
-                                                            ),
-                                                            position: Isometry2::new(
-                                                                [
-                                                                    x + x_offset
-                                                                        + physics_tile_width / 2.0,
-                                                                    y + y_offset
-                                                                        + physics_tile_height / 2.0,
-                                                                ]
-                                                                .into(),
-                                                                0.0,
-                                                            )
-                                                            .into(),
-                                                            ..Default::default()
-                                                        },
-                                                        collider_bundle: ColliderBundle {
-                                                            shape: ColliderShape::polyline(
-                                                                vertices, None,
-                                                            )
-                                                            .into(),
-                                                            position: collider_position.into(),
-                                                            ..Default::default()
-                                                        },
-                                                        ..Default::default()
-                                                    })
-                                                    .insert(ColliderDebugRender::with_id(
-                                                        id as usize,
-                                                    ))
-                                                    .insert(ColliderPositionSync::Discrete)
-                                                    .id(),
-                                            )
-                                        }
+                                        // ObjectShape::Polygon { points } => {
+                                        //     let mut vertices = Vec::with_capacity(points.len());
+                                        //     for (x, y) in points {
+                                        //         vertices.push(Point::<Real>::new(*x, *y));
+                                        //     }
+                                        //     let mut collider_position =
+                                        //         Isometry2::new([x_offset, y_offset].into(), 0.0);
+                                        //     collider_position.append_rotation_wrt_point_mut(
+                                        //         &UnitComplex::new(
+                                        //             TAU - object.rotation.to_radians(),
+                                        //         ),
+                                        //         &Point::new(x_offset, -y_offset),
+                                        //     );
+                                        //     Some(
+                                        //         commands
+                                        //             .spawn_bundle(WallColliderBundle {
+                                        //                 rigid_body_bundle: RigidBodyBundle {
+                                        //                     body_type: RigidBodyTypeComponent(
+                                        //                         RigidBodyType::Static,
+                                        //                     ),
+                                        //                     position: Isometry2::new(
+                                        //                         [
+                                        //                             x + x_offset
+                                        //                                 + physics_tile_width / 2.0,
+                                        //                             y + y_offset
+                                        //                                 + physics_tile_height / 2.0,
+                                        //                         ]
+                                        //                         .into(),
+                                        //                         0.0,
+                                        //                     )
+                                        //                     .into(),
+                                        //                     ..Default::default()
+                                        //                 },
+                                        //                 collider_bundle: ColliderBundle {
+                                        //                     shape: ColliderShape::polyline(
+                                        //                         vertices, None,
+                                        //                     )
+                                        //                     .into(),
+                                        //                     position: collider_position.into(),
+                                        //                     ..Default::default()
+                                        //                 },
+                                        //                 ..Default::default()
+                                        //             })
+                                        //             .insert(ColliderDebugRender::with_id(
+                                        //                 id as usize,
+                                        //             ))
+                                        //             .insert(ColliderPositionSync::Discrete)
+                                        //             .id(),
+                                        //     )
+                                        // }
                                         _ => {
                                             warn!("Unsupported object shape: {:?}", object.shape);
                                             None
