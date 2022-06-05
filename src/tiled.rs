@@ -257,7 +257,7 @@ fn add_colliders(
                                                         position: Isometry2::new(
                                                             [x + x_offset + physics_tile_width / 2.0, y + y_offset + physics_tile_height / 2.0]
                                                                 .into(),
-                                                            0.0,
+                                                            object.rotation.to_radians(),
                                                         ).into(),
                                                         ..Default::default()
                                                     })
