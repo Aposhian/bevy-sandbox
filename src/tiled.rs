@@ -1,8 +1,9 @@
 use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_rapier2d::prelude::*;
-use nalgebra::Isometry2;
+use nalgebra::{Isometry2, UnitComplex};
 use std::{path::Path, sync::Arc};
+use std::f32::consts::TAU;
 
 use tiled::{Loader, ObjectShape, Tileset};
 
@@ -210,12 +211,16 @@ fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<Tile
     }
 }
 
-#[derive(Bundle)]
+#[derive(Component, Default)]
+pub struct WallTag;
+
+#[derive(Bundle, Default)]
 pub struct WallColliderBundle {
     #[bundle]
     rigid_body_bundle: RigidBodyBundle,
     #[bundle]
     collider_bundle: ColliderBundle,
+    wall_tag: WallTag
 }
 
 fn add_colliders(
@@ -259,6 +264,14 @@ fn add_colliders(
                                         ObjectShape::Rect { width, height } => {
                                             let physics_width = width / physics_scale;
                                             let physics_height = height / physics_scale;
+                                            let mut collider_position = Isometry2::new(
+                                                [physics_width / 2.0 + x_offset, -physics_height / 2.0 - y_offset].into(),
+                                                0.0
+                                            );
+                                            collider_position.append_rotation_wrt_point_mut(
+                                                &UnitComplex::new(TAU - object.rotation.to_radians()),
+                                                &Point::new(x_offset, -y_offset)
+                                            );
                                             Some(
                                                 commands
                                                     .spawn_bundle(WallColliderBundle {
@@ -268,7 +281,7 @@ fn add_colliders(
                                                             ),
                                                             position: Isometry2::new(
                                                                 [x, y].into(),
-                                                                object.rotation.to_radians(),
+                                                                0.0
                                                             )
                                                             .into(),
                                                             ..Default::default()
@@ -279,13 +292,10 @@ fn add_colliders(
                                                                 physics_height / 2.0,
                                                             )
                                                             .into(),
-                                                            position: Isometry2::new(
-                                                                [x_offset, y_offset].into(),
-                                                                0.0,
-                                                            )
-                                                            .into(),
+                                                            position: collider_position.into(),
                                                             ..Default::default()
                                                         },
+                                                        ..Default::default()
                                                     })
                                                     .insert(ColliderDebugRender::with_id(
                                                         id as usize,
