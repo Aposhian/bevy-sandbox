@@ -7,9 +7,22 @@ use crate::health::Health;
 
 pub struct BallPlugin;
 
+/// Resource for holding texture atlas
+pub struct BallTextureHandle(Handle<Image>);
+
+impl FromWorld for BallTextureHandle {
+    fn from_world(world: &mut World) -> Self {
+        let asset_server = world.get_resource::<AssetServer>().unwrap();
+        let image = asset_server.load("spritesheets/baseball.png");
+        BallTextureHandle(image)
+    }
+}
+
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<BallSpawnEvent>().add_system(spawn);
+        app.add_event::<BallSpawnEvent>()
+            .init_resource::<BallTextureHandle>()
+            .add_system(spawn);
     }
 }
 
@@ -26,6 +39,8 @@ pub struct BallBundle {
     #[bundle]
     collider_bundle: ColliderBundle,
     health: Health,
+    #[bundle]
+    sprite_bundle: SpriteBundle
 }
 
 impl Default for BallBundle {
@@ -53,6 +68,7 @@ impl Default for BallBundle {
                 ..Default::default()
             },
             health: Health::from_max(1),
+            sprite_bundle: SpriteBundle::default()
         }
     }
 }
@@ -72,7 +88,11 @@ impl Default for BallSpawnEvent {
 }
 
 /// Spawn entities in response to spawn events
-fn spawn(mut commands: Commands, mut spawn_events: EventReader<BallSpawnEvent>) {
+fn spawn(
+    mut commands: Commands,
+    mut spawn_events: EventReader<BallSpawnEvent>,
+    texture_handle: Res<BallTextureHandle>,
+) {
     for spawn_event in spawn_events.iter() {
         commands
             .spawn_bundle(BallBundle {
@@ -89,8 +109,13 @@ fn spawn(mut commands: Commands, mut spawn_events: EventReader<BallSpawnEvent>) 
                     position: spawn_event.position.into(),
                     ..Default::default()
                 },
+                sprite_bundle: SpriteBundle {
+                    texture: texture_handle.0.clone(),
+                    transform: Transform::from_scale(Vec3::splat(1.0))
+                    * Transform::from_translation(Vec3::new(0.0, 0.0, 2.0)),
+                    ..Default::default()
+                },
                 ..Default::default()
-            })
-            .insert(ColliderDebugRender::with_id(2));
+            });
     }
 }
