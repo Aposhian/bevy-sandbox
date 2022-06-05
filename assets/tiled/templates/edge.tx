@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<template>
- <object type="wall" width="16" height="32">
-  <polygon points="0,0 16,0 16,32 0,32"/>
- </object>
-</template>

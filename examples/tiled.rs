@@ -20,6 +20,6 @@ fn main() {
 
 fn spawn_tilemap(mut tilemap_spawn_event: EventWriter<TilemapSpawnEvent>) {
     tilemap_spawn_event.send(TilemapSpawnEvent {
-        path: Path::new("assets/tiled/maps/example.tmx"),
+        path: Path::new("assets/example.tmx"),
     })
 }
