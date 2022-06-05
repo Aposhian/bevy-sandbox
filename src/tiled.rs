@@ -14,7 +14,7 @@ pub struct TiledPlugin;
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TilemapSpawnEvent>()
-            .add_plugin(RapierRenderPlugin)
+            // .add_plugin(RapierRenderPlugin)
             .add_system(spawn)
             .add_system(set_texture_filters_to_nearest)
             .add_system(process_object_layers)
@@ -242,6 +242,9 @@ fn add_colliders(
                                             let physics_width = width / physics_scale;
                                             let physics_height = height / physics_scale;
 
+                                            let physics_tile_width = tiled_map.tile_width as f32 / physics_scale;
+                                            let physics_tile_height = tiled_map.tile_height as f32 / physics_scale;
+
                                             let x = (column * tiled_map.tile_width) as f32
                                                 / physics_scale;
                                             let y = (row * tiled_map.tile_height) as f32
@@ -255,7 +258,7 @@ fn add_colliders(
                                                             RigidBodyType::Static,
                                                         ),
                                                         position: Isometry2::new(
-                                                            [x + x_offset, y + y_offset]
+                                                            [x + x_offset + physics_tile_width / 2.0, y + y_offset + physics_tile_height / 2.0]
                                                                 .into(),
                                                             0.0,
                                                         ).into(),
@@ -263,8 +266,8 @@ fn add_colliders(
                                                     })
                                                     .insert_bundle(ColliderBundle {
                                                         shape: ColliderShape::cuboid(
-                                                            physics_width / 2.0 - 0.1,
-                                                            physics_height / 2.0 - 0.1,
+                                                            physics_width / 2.0,
+                                                            physics_height / 2.0,
                                                         )
                                                         .into(),
                                                         ..Default::default()

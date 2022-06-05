@@ -35,7 +35,6 @@ impl PluginGroup for SandboxPlugins {
         group.add(DefaultResources);
         group.add(InputPlugin);
         group.add(SimpleFigurePlugin);
-        group.add(ObstaclePlugin);
         group.add(CameraPlugin);
         group.add(BallPlugin);
         group.add(HealthPlugin);
