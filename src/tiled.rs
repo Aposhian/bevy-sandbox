@@ -2,8 +2,8 @@ use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_rapier2d::prelude::*;
 use nalgebra::{Isometry2, UnitComplex};
-use std::{path::Path, sync::Arc};
 use std::f32::consts::TAU;
+use std::{path::Path, sync::Arc};
 
 use tiled::{Loader, ObjectShape, Tileset};
 
@@ -220,7 +220,7 @@ pub struct WallColliderBundle {
     rigid_body_bundle: RigidBodyBundle,
     #[bundle]
     collider_bundle: ColliderBundle,
-    wall_tag: WallTag
+    wall_tag: WallTag,
 }
 
 fn add_colliders(
@@ -265,12 +265,18 @@ fn add_colliders(
                                             let physics_width = width / physics_scale;
                                             let physics_height = height / physics_scale;
                                             let mut collider_position = Isometry2::new(
-                                                [physics_width / 2.0 + x_offset, -physics_height / 2.0 - y_offset].into(),
-                                                0.0
+                                                [
+                                                    physics_width / 2.0 + x_offset,
+                                                    -physics_height / 2.0 - y_offset,
+                                                ]
+                                                .into(),
+                                                0.0,
                                             );
                                             collider_position.append_rotation_wrt_point_mut(
-                                                &UnitComplex::new(TAU - object.rotation.to_radians()),
-                                                &Point::new(x_offset, -y_offset)
+                                                &UnitComplex::new(
+                                                    TAU - object.rotation.to_radians(),
+                                                ),
+                                                &Point::new(x_offset, -y_offset),
                                             );
                                             Some(
                                                 commands
@@ -281,7 +287,7 @@ fn add_colliders(
                                                             ),
                                                             position: Isometry2::new(
                                                                 [x, y].into(),
-                                                                0.0
+                                                                0.0,
                                                             )
                                                             .into(),
                                                             ..Default::default()
@@ -309,30 +315,42 @@ fn add_colliders(
                                             for (x, y) in points {
                                                 vertices.push(Point::<Real>::new(*x, *y));
                                             }
+                                            let mut collider_position =
+                                                Isometry2::new([x_offset, y_offset].into(), 0.0);
+                                            collider_position.append_rotation_wrt_point_mut(
+                                                &UnitComplex::new(
+                                                    TAU - object.rotation.to_radians(),
+                                                ),
+                                                &Point::new(x_offset, -y_offset),
+                                            );
                                             Some(
                                                 commands
-                                                    .spawn_bundle(RigidBodyBundle {
-                                                        body_type: RigidBodyTypeComponent(
-                                                            RigidBodyType::Static,
-                                                        ),
-                                                        position: Isometry2::new(
-                                                            [
-                                                                x + x_offset
-                                                                    + physics_tile_width / 2.0,
-                                                                y + y_offset
-                                                                    + physics_tile_height / 2.0,
-                                                            ]
+                                                    .spawn_bundle(WallColliderBundle {
+                                                        rigid_body_bundle: RigidBodyBundle {
+                                                            body_type: RigidBodyTypeComponent(
+                                                                RigidBodyType::Static,
+                                                            ),
+                                                            position: Isometry2::new(
+                                                                [
+                                                                    x + x_offset
+                                                                        + physics_tile_width / 2.0,
+                                                                    y + y_offset
+                                                                        + physics_tile_height / 2.0,
+                                                                ]
+                                                                .into(),
+                                                                0.0,
+                                                            )
                                                             .into(),
-                                                            0.0,
-                                                        )
-                                                        .into(),
-                                                        ..Default::default()
-                                                    })
-                                                    .insert_bundle(ColliderBundle {
-                                                        shape: ColliderShape::polyline(
-                                                            vertices, None,
-                                                        )
-                                                        .into(),
+                                                            ..Default::default()
+                                                        },
+                                                        collider_bundle: ColliderBundle {
+                                                            shape: ColliderShape::polyline(
+                                                                vertices, None,
+                                                            )
+                                                            .into(),
+                                                            position: collider_position.into(),
+                                                            ..Default::default()
+                                                        },
                                                         ..Default::default()
                                                     })
                                                     .insert(ColliderDebugRender::with_id(
