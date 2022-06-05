@@ -196,9 +196,7 @@ fn spawn(
     }
 }
 
-fn process_object_layers(
-    tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
-) {
+fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
             return match layer.layer_type() {
@@ -232,60 +230,69 @@ fn add_colliders(
                 if let Some(object_layer_data) = &tile.collision {
                     let object_layer_data = object_layer_data.clone();
                     let physics_scale = rc.scale;
-                    collider_spawners.insert(id, move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
-                        object_layer_data
-                            .object_data()
-                            .iter()
-                            .filter_map(|object| {
-                                match object.shape {
-                                    ObjectShape::Rect { width, height } => {
-                                        let physics_width = width / physics_scale;
-                                        let physics_height = height / physics_scale;
+                    collider_spawners.insert(
+                        id,
+                        move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
+                            object_layer_data
+                                .object_data()
+                                .iter()
+                                .filter_map(|object| {
+                                    match object.shape {
+                                        ObjectShape::Rect { width, height } => {
+                                            let physics_width = width / physics_scale;
+                                            let physics_height = height / physics_scale;
 
-                                        let x = (column * tiled_map.tile_width) as f32 / physics_scale;
-                                        let y = (row * tiled_map.tile_height) as f32 / physics_scale;
-                                        let x_offset = object.x / physics_scale;
-                                        let y_offset = object.y / physics_scale;
-                                        info!("spawning a collider");
-                                        Some(
-                                            commands
-                                                .spawn_bundle(ColliderBundle {
-                                                    shape: ColliderShape::cuboid(
-                                                        // physics_width / 2.0,
-                                                        // physics_height / 2.0,
-                                                        1.0, 1.0
-                                                    )
-                                                    .into(),
-                                                    position: Isometry2::new(
-                                                        [x + x_offset, y + y_offset - 3.0].into(),
-                                                        0.0,
-                                                    )
-                                                    .into(),
-                                                    ..Default::default()
-                                                })
-                                                .insert(ColliderDebugRender::with_id(2))
-                                                .insert(ColliderPositionSync::Discrete)
-                                                .id()
-                                        )
+                                            let x = (column * tiled_map.tile_width) as f32
+                                                / physics_scale;
+                                            let y = (row * tiled_map.tile_height) as f32
+                                                / physics_scale;
+                                            let x_offset = object.x / physics_scale;
+                                            let y_offset = object.y / physics_scale;
+                                            Some(
+                                                commands
+                                                    .spawn_bundle(RigidBodyBundle {
+                                                        body_type: RigidBodyTypeComponent(
+                                                            RigidBodyType::Static,
+                                                        ),
+                                                        position: Isometry2::new(
+                                                            [x + x_offset, y + y_offset]
+                                                                .into(),
+                                                            0.0,
+                                                        ).into(),
+                                                        ..Default::default()
+                                                    })
+                                                    .insert_bundle(ColliderBundle {
+                                                        shape: ColliderShape::cuboid(
+                                                            physics_width / 2.0 - 0.1,
+                                                            physics_height / 2.0 - 0.1,
+                                                        )
+                                                        .into(),
+                                                        ..Default::default()
+                                                    })
+                                                    .insert(ColliderDebugRender::with_id(2))
+                                                    .insert(ColliderPositionSync::Discrete)
+                                                    .id(),
+                                            )
+                                        }
+                                        _ => None,
                                     }
-                                    _ => None,
-                                }
-                            })
-                            .collect()
-                    });
+                                })
+                                .collect()
+                        },
+                    );
                 }
             }
         }
 
-        for x in 3..4 {
-            for y in 0..1 {
+        for x in 0..tiled_map.width {
+            for y in 0..tiled_map.height {
                 if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), MAP_ID, 1) {
                     if let Ok(tile) = tile_query.get(tile_entity) {
                         if let Some(spawner) = collider_spawners.get(&(tile.texture_index as u32)) {
                             let object_entities = spawner(&mut commands, x, y);
-                            // commands
-                            //     .entity(tile_entity)
-                            //     .push_children(object_entities.as_slice());
+                            commands
+                                .entity(tile_entity)
+                                .push_children(object_entities.as_slice());
                         }
                     }
                 }
