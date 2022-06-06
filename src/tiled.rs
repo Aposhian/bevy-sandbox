@@ -208,9 +208,12 @@ fn process_object_layers(
                     let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
 
                     if let ObjectShape::Rect { width, height } = object.shape {
-                        info!("Found rect of {width}, {height}");
+                        let playable = match object.properties.get("playable").unwrap_or(&tiled::PropertyValue::BoolValue(true)) {
+                            tiled::PropertyValue::BoolValue(playable) => *playable,
+                            _ => false
+                        };
                         spawn_event.send(SimpleFigureSpawnEvent {
-                            playable: true,
+                            playable,
                             position: Isometry2::new(
                                 [object.x / rc.scale, y_pixels / rc.scale].into(),
                                 0.0
