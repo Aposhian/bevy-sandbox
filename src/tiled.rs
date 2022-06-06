@@ -207,7 +207,7 @@ fn process_object_layers(
                 if object.obj_type.as_str() == "simple_figure" {
                     let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
 
-                    if let ObjectShape::Rect { width, height } = object.shape {
+                    if let ObjectShape::Rect { width: _, height: _ } = object.shape {
                         let playable = match object.properties.get("playable").unwrap_or(&tiled::PropertyValue::BoolValue(true)) {
                             tiled::PropertyValue::BoolValue(playable) => *playable,
                             _ => false
