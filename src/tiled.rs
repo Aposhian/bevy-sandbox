@@ -97,60 +97,56 @@ fn process_layer(
             Vec2::new(tiled_map.tile_width as f32, tiled_map.tile_height as f32);
         layer_settings.mesh_type = TilemapMeshType::Square;
 
-        let layer_type = layer.layer_type();
-        let tile_layer = match layer_type {
-            tiled::LayerType::Tiles(layer) => match layer {
+        if let tiled::LayerType::Tiles(tile_layer) = layer.layer_type() {
+            let finite_tile_layer = match tile_layer {
                 tiled::TileLayer::Finite(data) => data,
                 tiled::TileLayer::Infinite(_) => {
                     panic!("infinite tilemaps not supported");
                 }
-            },
-            _ => {
-                panic!("Unsupported layer type: {:?}", layer_type);
-            }
+            };
+
+            let layer_entity = LayerBuilder::<TileBundle>::new_batch(
+                commands,
+                layer_settings.clone(),
+                meshes,
+                texture_handle.clone(),
+                MAP_ID,
+                layer.id() as u16,
+                |mut tile_pos| {
+                    if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
+                        return None;
+                    }
+    
+                    if tiled_map.orientation == tiled::Orientation::Orthogonal {
+                        tile_pos.1 = (tiled_map.height - 1) as u32 - tile_pos.1;
+                    }
+    
+                    let tile = &finite_tile_layer
+                        .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
+                        .unwrap();
+    
+                    let tile = Tile {
+                        texture_index: tile.id() as u16,
+                        flip_x: tile.flip_h,
+                        flip_y: tile.flip_v,
+                        flip_d: tile.flip_d,
+                        ..Default::default()
+                    };
+    
+                    Some(TileBundle {
+                        tile,
+                        ..Default::default()
+                    })
+                },
+            );
+    
+            ecs_map.add_layer(commands, layer.id() as u16, layer_entity);
+            commands.entity(layer_entity).insert(Transform::from_xyz(
+                layer.offset_y,
+                -layer.offset_x,
+                layer.id() as f32,
+            ));
         };
-
-        let layer_entity = LayerBuilder::<TileBundle>::new_batch(
-            commands,
-            layer_settings.clone(),
-            meshes,
-            texture_handle.clone(),
-            MAP_ID,
-            layer.id() as u16,
-            |mut tile_pos| {
-                if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
-                    return None;
-                }
-
-                if tiled_map.orientation == tiled::Orientation::Orthogonal {
-                    tile_pos.1 = (tiled_map.height - 1) as u32 - tile_pos.1;
-                }
-
-                let tile = &tile_layer
-                    .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
-                    .unwrap();
-
-                let tile = Tile {
-                    texture_index: tile.id() as u16,
-                    flip_x: tile.flip_h,
-                    flip_y: tile.flip_v,
-                    flip_d: tile.flip_d,
-                    ..Default::default()
-                };
-
-                Some(TileBundle {
-                    tile,
-                    ..Default::default()
-                })
-            },
-        );
-
-        ecs_map.add_layer(commands, layer.id() as u16, layer_entity);
-        commands.entity(layer_entity).insert(Transform::from_xyz(
-            layer.offset_y,
-            -layer.offset_x,
-            layer.id() as f32,
-        ));
     }
 }
 
