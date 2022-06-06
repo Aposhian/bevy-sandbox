@@ -189,10 +189,10 @@ impl Default for SimpleFigureBundle {
 
 #[derive(Debug)]
 pub struct SimpleFigureSpawnEvent {
-    position: Isometry2<f32>,
-    scale: f32,
-    z: f32,
-    playable: bool,
+    pub position: Isometry2<f32>,
+    pub scale: f32,
+    pub z: f32,
+    pub playable: bool,
 }
 
 impl Default for SimpleFigureSpawnEvent {

@@ -7,6 +7,8 @@ use std::{path::Path, sync::Arc};
 
 use tiled::{Loader, ObjectShape, Tileset};
 
+use crate::simple_figure::SimpleFigureSpawnEvent;
+
 // TODO: change this from a constant so we can handle multiple maps
 const MAP_ID: u16 = 0u16;
 
@@ -187,7 +189,11 @@ fn spawn(
     }
 }
 
-fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>) {
+fn process_object_layers(
+    tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
+    mut spawn_event: EventWriter<SimpleFigureSpawnEvent>,
+    rc: Res<RapierConfiguration>
+) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
             return match layer.layer_type() {
@@ -198,9 +204,19 @@ fn process_object_layers(tiled_map_query: Query<&TiledMapComponent, Changed<Tile
             // TODO: flesh this out when actually using object layers
             info!("Found object layer");
             for object in object_layer.objects() {
-                if object.obj_type.as_str() == "wall" {
+                if object.obj_type.as_str() == "simple_figure" {
+                    let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
+
                     if let ObjectShape::Rect { width, height } = object.shape {
                         info!("Found rect of {width}, {height}");
+                        spawn_event.send(SimpleFigureSpawnEvent {
+                            playable: true,
+                            position: Isometry2::new(
+                                [object.x / rc.scale, y_pixels / rc.scale].into(),
+                                0.0
+                            ),
+                            ..Default::default()
+                        })
                     }
                 }
             }
