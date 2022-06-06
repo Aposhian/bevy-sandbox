@@ -201,7 +201,6 @@ fn process_object_layers(
                 _ => None,
             };
         }) {
-            // TODO: flesh this out when actually using object layers
             info!("Found object layer");
             for object in object_layer.objects() {
                 if object.obj_type.as_str() == "simple_figure" {
