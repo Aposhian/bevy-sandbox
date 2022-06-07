@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-up" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="6">
+<map version="1.5" tiledversion="1.7.2" orientation="orthogonal" renderorder="right-up" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="18">
  <tileset firstgid="1" source="grass_walls.tsx"/>
+ <tileset firstgid="19" source="simple_figure.tsx"/>
  <layer id="1" name="Tile Layer 1" width="100" height="100">
   <data encoding="csv">
 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -114,5 +115,17 @@
   <object id="3" template="simple_figure.tx" x="1384" y="2206"/>
   <object id="4" template="simple_figure.tx" x="1663.28" y="2211.94"/>
   <object id="5" template="simple_figure.tx" x="1524.78" y="1967.16"/>
+  <object id="6" template="simple_figure.tx" x="1393" y="2307"/>
+  <object id="7" template="simple_figure.tx" x="1528" y="2326"/>
+  <object id="8" template="simple_figure.tx" x="1569" y="2414"/>
+  <object id="9" template="simple_figure.tx" x="1316" y="2395"/>
+  <object id="10" template="simple_figure.tx" x="1531" y="2476"/>
+  <object id="11" template="simple_figure.tx" x="1685" y="2401"/>
+  <object id="12" template="simple_figure.tx" x="1822" y="2323"/>
+  <object id="13" template="simple_figure.tx" x="1789" y="2215"/>
+  <object id="14" template="simple_figure.tx" x="1715" y="2257"/>
+  <object id="15" template="simple_figure.tx" x="1781" y="2500"/>
+  <object id="16" template="simple_figure.tx" x="1646" y="2521"/>
+  <object id="17" template="simple_figure.tx" x="1856" y="2408"/>
  </objectgroup>
 </map>
