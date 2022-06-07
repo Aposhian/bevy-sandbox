@@ -40,7 +40,7 @@ pub struct BallBundle {
     collider_bundle: ColliderBundle,
     health: Health,
     #[bundle]
-    sprite_bundle: SpriteBundle
+    sprite_bundle: SpriteBundle,
 }
 
 impl Default for BallBundle {
@@ -68,7 +68,7 @@ impl Default for BallBundle {
                 ..Default::default()
             },
             health: Health::from_max(1),
-            sprite_bundle: SpriteBundle::default()
+            sprite_bundle: SpriteBundle::default(),
         }
     }
 }
@@ -94,28 +94,29 @@ fn spawn(
     texture_handle: Res<BallTextureHandle>,
 ) {
     for spawn_event in spawn_events.iter() {
-        commands
-            .spawn_bundle(BallBundle {
-                rigid_body_bundle: RigidBodyBundle {
-                    mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
-                    forces: RigidBodyForces {
-                        gravity_scale: 0.0,
-                        ..Default::default()
-                    }.into(),
-                    velocity: RigidBodyVelocity {
-                        linvel: spawn_event.velocity.into(),
-                        ..Default::default()
-                    }.into(),
-                    position: spawn_event.position.into(),
+        commands.spawn_bundle(BallBundle {
+            rigid_body_bundle: RigidBodyBundle {
+                mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
+                forces: RigidBodyForces {
+                    gravity_scale: 0.0,
                     ..Default::default()
-                },
-                sprite_bundle: SpriteBundle {
-                    texture: texture_handle.0.clone(),
-                    transform: Transform::from_scale(Vec3::splat(1.0))
-                    * Transform::from_translation(Vec3::new(0.0, 0.0, 2.0)),
+                }
+                .into(),
+                velocity: RigidBodyVelocity {
+                    linvel: spawn_event.velocity.into(),
                     ..Default::default()
-                },
+                }
+                .into(),
+                position: spawn_event.position.into(),
                 ..Default::default()
-            });
+            },
+            sprite_bundle: SpriteBundle {
+                texture: texture_handle.0.clone(),
+                transform: Transform::from_scale(Vec3::splat(1.0))
+                    * Transform::from_translation(Vec3::new(0.0, 0.0, 2.0)),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
     }
 }

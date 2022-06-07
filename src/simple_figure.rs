@@ -179,7 +179,8 @@ impl Default for SimpleFigureBundle {
                     collision_groups: InteractionGroups::new(0b0111, 0b0111),
                     active_events: ActiveEvents::CONTACT_EVENTS,
                     ..Default::default()
-                }.into(),
+                }
+                .into(),
                 ..Default::default()
             },
             move_action: Default::default(),
@@ -235,7 +236,8 @@ fn spawn(
                 forces: RigidBodyForces {
                     gravity_scale: 0.0,
                     ..Default::default()
-                }.into(),
+                }
+                .into(),
                 position: spawn_event.position.into(),
                 ..Default::default()
             },

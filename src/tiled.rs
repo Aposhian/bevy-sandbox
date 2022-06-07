@@ -118,15 +118,15 @@ fn process_layer(
                     if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
                         return None;
                     }
-    
+
                     if tiled_map.orientation == tiled::Orientation::Orthogonal {
                         tile_pos.1 = (tiled_map.height - 1) as u32 - tile_pos.1;
                     }
-    
+
                     let tile = &finite_tile_layer
                         .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
                         .unwrap();
-    
+
                     let tile = Tile {
                         texture_index: tile.id() as u16,
                         flip_x: tile.flip_h,
@@ -134,14 +134,14 @@ fn process_layer(
                         flip_d: tile.flip_d,
                         ..Default::default()
                     };
-    
+
                     Some(TileBundle {
                         tile,
                         ..Default::default()
                     })
                 },
             );
-    
+
             ecs_map.add_layer(commands, layer.id() as u16, layer_entity);
             commands.entity(layer_entity).insert(Transform::from_xyz(
                 layer.offset_y,
@@ -192,7 +192,7 @@ fn spawn(
 fn process_object_layers(
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
     mut spawn_event: EventWriter<SimpleFigureSpawnEvent>,
-    rc: Res<RapierConfiguration>
+    rc: Res<RapierConfiguration>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
@@ -206,16 +206,24 @@ fn process_object_layers(
                 if object.obj_type.as_str() == "simple_figure" {
                     let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
 
-                    if let ObjectShape::Rect { width: _, height: _ } = object.shape {
-                        let playable = match object.properties.get("playable").unwrap_or(&tiled::PropertyValue::BoolValue(true)) {
+                    if let ObjectShape::Rect {
+                        width: _,
+                        height: _,
+                    } = object.shape
+                    {
+                        let playable = match object
+                            .properties
+                            .get("playable")
+                            .unwrap_or(&tiled::PropertyValue::BoolValue(true))
+                        {
                             tiled::PropertyValue::BoolValue(playable) => *playable,
-                            _ => false
+                            _ => false,
                         };
                         spawn_event.send(SimpleFigureSpawnEvent {
                             playable,
                             position: Isometry2::new(
                                 [object.x / rc.scale, y_pixels / rc.scale].into(),
-                                0.0
+                                0.0,
                             ),
                             ..Default::default()
                         })
@@ -284,13 +292,12 @@ fn add_colliders(
                                             );
                                             // Tiled rotates about the top-left corner
                                             let clockwise_rotation = object.rotation.to_radians();
-                                            let counterclockwise_rotation = TAU - clockwise_rotation;
+                                            let counterclockwise_rotation =
+                                                TAU - clockwise_rotation;
 
                                             // This needs to rotate about the top-left corner
                                             collider_position.append_rotation_wrt_point_mut(
-                                                &UnitComplex::new(
-                                                    counterclockwise_rotation,
-                                                ),
+                                                &UnitComplex::new(counterclockwise_rotation),
                                                 &Point::new(x_offset, -y_offset),
                                             );
                                             Some(

@@ -19,8 +19,8 @@ fn setup(mut commands: Commands) {
     commands.spawn_bundle(builder.build(
         DrawMode::Stroke(StrokeMode {
             options: StrokeOptions::default().with_line_width(10.0),
-            color: Color::BLACK
+            color: Color::BLACK,
         }),
-        Transform::default()
+        Transform::default(),
     ));
 }

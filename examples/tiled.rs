@@ -2,7 +2,10 @@
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
-use bevy_sandbox::{tiled::{TiledPlugin, TilemapSpawnEvent}, SandboxPlugins};
+use bevy_sandbox::{
+    tiled::{TiledPlugin, TilemapSpawnEvent},
+    SandboxPlugins,
+};
 use std::path::Path;
 
 fn main() {

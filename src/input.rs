@@ -1,4 +1,6 @@
 use crate::ball::BallSpawnEvent;
+use bevy::math::Vec3Swizzles;
+use bevy::math::Vec4Swizzles;
 use bevy::render::camera::Camera;
 use bevy::{
     input::{keyboard::KeyCode, Input},
@@ -6,8 +8,6 @@ use bevy::{
 };
 use bevy_rapier2d::prelude::*;
 use nalgebra::Isometry2;
-use bevy::math::Vec3Swizzles;
-use bevy::math::Vec4Swizzles;
 
 pub struct InputPlugin;
 
