@@ -16,7 +16,8 @@ pub struct PathfindingPlugin;
 
 impl Plugin for PathfindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(compute_path_to_goal).add_system(draw_paths);
+        app.add_system(compute_path_to_goal);
+        // .add_system(draw_paths);
     }
 }
 
@@ -115,7 +116,6 @@ fn compute_path_to_goal(
     for (entity, start_position, shape, GoalPosition { position: goal }) in query.iter() {
         let start_grid = GridPoint::from(Vec2::from(start_position.position.translation));
         let goal_grid = GridPoint::from(Vec2::from(goal.translation));
-        info!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
         let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
         let result = astar(
