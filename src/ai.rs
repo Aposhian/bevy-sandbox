@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 use crate::input::PlayerTag;
-use crate::pathfinding::GoalPosition;
+use crate::pathfinding::{GoalPosition, Path};
 use crate::simple_figure::SimpleFigureTag;
 
 pub struct AiPlugin;
@@ -30,9 +30,12 @@ fn zombie_follow(
     if timer.0.finished() {
         if let Some(player_position) = player.iter().next() {
             for entity in zombies.iter() {
-                commands.entity(entity).insert(GoalPosition {
-                    position: player_position.position,
-                });
+                commands
+                    .entity(entity)
+                    .insert(GoalPosition {
+                        position: player_position.position,
+                    })
+                    .insert(Path::default());
             }
         }
     }
