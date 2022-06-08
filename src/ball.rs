@@ -4,6 +4,9 @@ use nalgebra::Isometry2;
 
 use crate::health::CollisionDamage;
 use crate::health::Health;
+use crate::physics::CHARACTER_GROUP;
+use crate::physics::PROJECTILE_GROUP;
+use crate::physics::WALL_GROUP;
 
 pub struct BallPlugin;
 
@@ -53,7 +56,10 @@ impl Default for BallBundle {
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::ball(0.1).into(),
                 flags: ColliderFlags {
-                    collision_groups: InteractionGroups::new(0b0011, 0b0011),
+                    collision_groups: InteractionGroups::new(
+                        PROJECTILE_GROUP,
+                        PROJECTILE_GROUP | WALL_GROUP | CHARACTER_GROUP,
+                    ),
                     active_events: ActiveEvents::CONTACT_EVENTS,
                     ..Default::default()
                 }

@@ -12,6 +12,7 @@ use std::ops::Sub;
 use crate::ecs::BondedEntities;
 use crate::ecs::DespawnEvent;
 use crate::input::PlayerTag;
+use crate::physics::{CHARACTER_GROUP, WALL_GROUP};
 
 pub struct PathfindingPlugin;
 
@@ -154,7 +155,10 @@ fn compute_path_to_goal(
                                 &direction.into(),
                                 &*inflated_shape,
                                 MAX_TOI,
-                                InteractionGroups::new(0b0100, 0b0100),
+                                InteractionGroups::new(
+                                    CHARACTER_GROUP,
+                                    CHARACTER_GROUP | WALL_GROUP,
+                                ),
                                 Some(&|handle| {
                                     handle != entity.handle()
                                         && match player_entity {

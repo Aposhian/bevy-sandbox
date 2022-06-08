@@ -13,6 +13,7 @@ mod input;
 pub mod obstacle;
 mod pathfinding;
 mod pathfollowing;
+mod physics;
 pub mod simple_figure;
 pub mod tiled;
 

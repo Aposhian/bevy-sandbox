@@ -8,6 +8,7 @@ use std::f32::consts::FRAC_PI_4;
 use crate::camera::CameraTarget;
 use crate::health::Health;
 use crate::input::{MoveAction, PlayerTag};
+use crate::physics::{CHARACTER_GROUP, PROJECTILE_GROUP, WALL_GROUP};
 
 pub struct SimpleFigurePlugin;
 
@@ -176,7 +177,10 @@ impl Default for SimpleFigureBundle {
             collider_bundle: ColliderBundle {
                 shape: ColliderShape::cuboid(0.18, 0.40).into(),
                 flags: ColliderFlags {
-                    collision_groups: InteractionGroups::new(0b0111, 0b0111),
+                    collision_groups: InteractionGroups::new(
+                        CHARACTER_GROUP,
+                        CHARACTER_GROUP | WALL_GROUP | PROJECTILE_GROUP,
+                    ),
                     active_events: ActiveEvents::CONTACT_EVENTS,
                     ..Default::default()
                 }
