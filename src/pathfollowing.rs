@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
+use futures_lite::future;
 
 use crate::input::MoveAction;
-use crate::pathfinding::Path;
+use crate::pathfinding::ComputePath;
 
 pub struct PathfollowingPlugin;
 
@@ -25,7 +26,10 @@ impl Default for Carrot {
     }
 }
 
-fn reset_carrot(mut commands: Commands, q: Query<Entity, Or<(Added<Path>, Changed<Path>)>>) {
+fn reset_carrot(
+    mut commands: Commands,
+    q: Query<Entity, Or<(Added<ComputePath>, Changed<ComputePath>)>>,
+) {
     for entity in q.iter() {
         commands.entity(entity).insert(Carrot::default());
     }
@@ -35,16 +39,23 @@ const VELOCITY_SCALE: f32 = 0.5;
 
 fn go_to_carrot(
     mut q: Query<
-        (&mut MoveAction, &RigidBodyPositionComponent, &Carrot, &Path),
+        (
+            &mut MoveAction,
+            &RigidBodyPositionComponent,
+            &Carrot,
+            &mut ComputePath,
+        ),
         Or<(Added<Carrot>, Changed<Carrot>)>,
     >,
 ) {
-    for (mut move_action, pos, carrot, path) in q.iter_mut() {
-        if let Some(&carrot_position) = path.points.get(carrot.index) {
-            let current_position: Vec2 = pos.position.translation.into();
+    for (mut move_action, pos, carrot, mut path) in q.iter_mut() {
+        if let Some(Some(path)) = future::block_on(future::poll_once(&mut path.task)) {
+            if let Some(&carrot_position) = path.points.get(carrot.index) {
+                let current_position: Vec2 = pos.position.translation.into();
 
-            let delta = (carrot_position - current_position).normalize_or_zero();
-            move_action.desired_velocity = (VELOCITY_SCALE * delta).into();
+                let delta = (carrot_position - current_position).normalize_or_zero();
+                move_action.desired_velocity = (VELOCITY_SCALE * delta).into();
+            }
         }
     }
 }
@@ -58,17 +69,22 @@ fn goal_checker(
         &mut Carrot,
         &mut RigidBodyVelocityComponent,
         &RigidBodyPositionComponent,
-        &Path,
+        &mut ComputePath,
     )>,
 ) {
-    for (entity, mut carrot, mut vel, pos, path) in q.iter_mut() {
-        if let Some(carrot_position) = path.points.get(carrot.index) {
-            let current_position: Vec2 = pos.position.translation.into();
-            if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
-                carrot.index += 1;
-                if carrot.index >= path.points.len() {
-                    vel.linvel = Vec2::ZERO.into();
-                    commands.entity(entity).remove::<Path>().remove::<Carrot>();
+    for (entity, mut carrot, mut vel, pos, mut path) in q.iter_mut() {
+        if let Some(Some(path)) = future::block_on(future::poll_once(&mut path.task)) {
+            if let Some(carrot_position) = path.points.get(carrot.index) {
+                let current_position: Vec2 = pos.position.translation.into();
+                if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
+                    carrot.index += 1;
+                    if carrot.index >= path.points.len() {
+                        vel.linvel = Vec2::ZERO.into();
+                        commands
+                            .entity(entity)
+                            .remove::<ComputePath>()
+                            .remove::<Carrot>();
+                    }
                 }
             }
         }
