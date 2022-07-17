@@ -42,13 +42,13 @@ fn health_despawner(
 fn damage(
     damager_query: Query<&CollisionDamage>,
     mut health_query: Query<&mut Health>,
-    mut contact_events: EventReader<ContactEvent>,
+    mut contact_events: EventReader<CollisionEvent>,
 ) {
     for contact_event in contact_events.iter() {
-        if let ContactEvent::Started(c1, c2) = contact_event {
+        if let CollisionEvent::Started(c1, c2, _) = contact_event {
             for (damager, damageable) in [(c1, c2), (c2, c1)] {
-                if let Ok(CollisionDamage { damage }) = damager_query.get(damager.entity()) {
-                    if let Ok(mut health) = health_query.get_mut(damageable.entity()) {
+                if let Ok(CollisionDamage { damage }) = damager_query.get(*damager) {
+                    if let Ok(mut health) = health_query.get_mut(*damageable) {
                         health.current -= damage;
                     }
                 }

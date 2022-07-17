@@ -1,23 +1,17 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
-use nalgebra::Isometry2;
 
 pub struct ObstaclePlugin;
 
 impl Plugin for ObstaclePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(RapierRenderPlugin);
+        app.add_plugin(RapierDebugRenderPlugin::default());
     }
 }
 
 pub fn spawn(mut commands: Commands) {
-    let collider = ColliderBundle {
-        shape: ColliderShape::cuboid(1.0, 1.0).into(),
-        position: Isometry2::new([3.0, 3.0].into(), 0.0).into(),
-        ..Default::default()
-    };
     commands
-        .spawn_bundle(collider)
-        .insert(ColliderDebugRender::with_id(2))
-        .insert(ColliderPositionSync::Discrete);
+        .spawn()
+        .insert(Collider::cuboid(1.0, 1.0))
+        .insert(Transform::from_translation(Vec3::new(1000.0, 1000.0, 0.0)));
 }

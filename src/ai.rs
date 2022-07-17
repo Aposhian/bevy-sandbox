@@ -1,3 +1,4 @@
+use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
@@ -23,7 +24,7 @@ fn zombie_follow(
     mut commands: Commands,
     time: Res<Time>,
     mut timer: ResMut<ReplanTimer>,
-    player: Query<&RigidBodyPositionComponent, With<PlayerTag>>,
+    player: Query<&Transform, With<PlayerTag>>,
     zombies: Query<Entity, (Without<PlayerTag>, With<SimpleFigureTag>)>,
 ) {
     timer.0.tick(time.delta());
@@ -32,7 +33,7 @@ fn zombie_follow(
             for entity in zombies.iter() {
                 info!("Resetting zombie goal");
                 commands.entity(entity).insert(GoalPosition {
-                    position: player_position.position,
+                    position: player_position.translation.xy(),
                 });
             }
         }

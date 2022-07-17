@@ -7,7 +7,6 @@ use bevy::{
     prelude::*,
 };
 use bevy_rapier2d::prelude::*;
-use nalgebra::Isometry2;
 
 pub struct InputPlugin;
 
@@ -63,7 +62,6 @@ fn keyboard(
 fn mouse_aim(
     buttons: Res<Input<MouseButton>>,
     windows: Res<Windows>,
-    rapier_config: Res<RapierConfiguration>,
     player_query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<&Transform, With<Camera>>,
     mut ball_spawn_event: EventWriter<BallSpawnEvent>,
@@ -86,14 +84,16 @@ fn mouse_aim(
                     let cursor_world_pos =
                         camera_transform.compute_matrix() * p.extend(0.0).extend(1.0);
 
-                    let player_pos = (player_tf.translation / rapier_config.scale).xy();
-                    let cursor_real_pos = (cursor_world_pos / rapier_config.scale).xy();
+                    let player_pos = (player_tf.translation).xy();
+                    let cursor_real_pos = (cursor_world_pos).xy();
                     let direction = (cursor_real_pos - player_pos).normalize_or_zero();
 
                     info!("goal_position: {:?}", cursor_real_pos);
 
                     ball_spawn_event.send(BallSpawnEvent {
-                        position: Isometry2::new((player_pos + direction * 1.0).into(), 0.0),
+                        transform: Transform::from_translation(
+                            (player_pos + direction).extend(2.0),
+                        ),
                         velocity: direction * 10.0,
                         ..Default::default()
                     });
@@ -103,7 +103,7 @@ fn mouse_aim(
     }
 }
 
-fn movement(mut query: Query<(&MoveAction, &mut RigidBodyVelocityComponent)>) {
+fn movement(mut query: Query<(&MoveAction, &mut Velocity)>) {
     for (move_action, mut velocity) in query.iter_mut() {
         // TODO: use forces or impulses rather than setting velocity
         velocity.linvel = (move_action.desired_velocity * 5.0).into();

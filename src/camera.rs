@@ -20,18 +20,18 @@ const X_DEAD_ZONE: f32 = 32.0;
 const Y_DEAD_ZONE: f32 = 32.0;
 
 fn camera_follow(
-    mut q: QuerySet<(
-        QueryState<(&CameraTarget, &Transform)>,
-        QueryState<(&Camera, &mut Transform)>,
+    mut q: ParamSet<(
+        Query<(&CameraTarget, &Transform)>,
+        Query<(&Camera, &mut Transform)>,
     )>,
 ) {
-    let translation = if let Some((_tag, target_transform)) = q.q0().iter().next() {
+    let translation = if let Some((_tag, target_transform)) = q.p0().iter().next() {
         Some(target_transform.translation)
     } else {
         None
     };
 
-    if let Some((_current_camera, mut camera_transform)) = q.q1().iter_mut().next() {
+    if let Some((_current_camera, mut camera_transform)) = q.p1().iter_mut().next() {
         if let Some(translation) = translation {
             let x_diff = translation.x - camera_transform.translation.x;
             let y_diff = translation.y - camera_transform.translation.y;

@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
-use nalgebra::Isometry2;
 
 use crate::health::CollisionDamage;
 use crate::health::Health;
@@ -33,11 +32,14 @@ pub struct BallTag;
 pub struct BallBundle {
     tag: BallTag,
     collision_damage: CollisionDamage,
-    #[bundle]
-    rigid_body_bundle: RigidBodyBundle,
-    position_sync: RigidBodyPositionSync,
-    #[bundle]
-    collider_bundle: ColliderBundle,
+    rigid_body: RigidBody,
+    collider: Collider,
+    collision_groups: CollisionGroups,
+    active_events: ActiveEvents,
+    locked_axes: LockedAxes,
+    gravity_scale: GravityScale,
+    restitution: Restitution,
+    velocity: Velocity,
     health: Health,
     #[bundle]
     sprite_bundle: SpriteBundle,
@@ -47,26 +49,18 @@ impl Default for BallBundle {
     fn default() -> Self {
         BallBundle {
             tag: BallTag,
-            rigid_body_bundle: Default::default(),
-            collision_damage: CollisionDamage { damage: 1 },
-            position_sync: RigidBodyPositionSync::Discrete,
-            collider_bundle: ColliderBundle {
-                shape: ColliderShape::ball(0.1).into(),
-                flags: ColliderFlags {
-                    collision_groups: InteractionGroups::new(0b0011, 0b0011),
-                    active_events: ActiveEvents::CONTACT_EVENTS,
-                    ..Default::default()
-                }
-                .into(),
-                mass_properties: ColliderMassProps::Density(0.001).into(),
-                material: ColliderMaterial {
-                    restitution: 1.0,
-                    restitution_combine_rule: CoefficientCombineRule::Average,
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
+            rigid_body: Default::default(),
+            collider: Collider::ball(0.1),
+            collision_groups: CollisionGroups::new(0b0011, 0b0011),
+            active_events: ActiveEvents::COLLISION_EVENTS,
+            locked_axes: LockedAxes::ROTATION_LOCKED,
+            gravity_scale: GravityScale(0.0),
+            velocity: Default::default(),
+            restitution: Restitution {
+                coefficient: 1.0,
+                combine_rule: CoefficientCombineRule::Average,
             },
+            collision_damage: CollisionDamage { damage: 1 },
             health: Health::from_max(1),
             sprite_bundle: SpriteBundle::default(),
         }
@@ -74,14 +68,14 @@ impl Default for BallBundle {
 }
 
 pub struct BallSpawnEvent {
-    pub position: Isometry2<f32>,
+    pub transform: Transform,
     pub velocity: Vec2,
 }
 
 impl Default for BallSpawnEvent {
     fn default() -> Self {
         BallSpawnEvent {
-            position: Isometry2::identity(),
+            transform: Transform::identity(),
             velocity: Vec2::ZERO,
         }
     }
@@ -95,25 +89,13 @@ fn spawn(
 ) {
     for spawn_event in spawn_events.iter() {
         commands.spawn_bundle(BallBundle {
-            rigid_body_bundle: RigidBodyBundle {
-                mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
-                forces: RigidBodyForces {
-                    gravity_scale: 0.0,
-                    ..Default::default()
-                }
-                .into(),
-                velocity: RigidBodyVelocity {
-                    linvel: spawn_event.velocity.into(),
-                    ..Default::default()
-                }
-                .into(),
-                position: spawn_event.position.into(),
+            velocity: Velocity {
+                linvel: spawn_event.velocity.into(),
                 ..Default::default()
             },
             sprite_bundle: SpriteBundle {
                 texture: texture_handle.0.clone(),
-                transform: Transform::from_scale(Vec3::splat(1.0))
-                    * Transform::from_translation(Vec3::new(0.0, 0.0, 2.0)),
+                transform: spawn_event.transform,
                 ..Default::default()
             },
             ..Default::default()

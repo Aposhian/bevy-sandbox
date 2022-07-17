@@ -54,17 +54,11 @@ const GOAL_TOLERANCE: f32 = 0.1;
 
 fn goal_checker(
     mut commands: Commands,
-    mut q: Query<(
-        Entity,
-        &mut Carrot,
-        &mut RigidBodyVelocityComponent,
-        &RigidBodyPositionComponent,
-        &Path,
-    )>,
+    mut q: Query<(Entity, &mut Carrot, &mut Velocity, &Transform, &Path)>,
 ) {
-    for (entity, mut carrot, mut vel, pos, path) in q.iter_mut() {
+    for (entity, mut carrot, mut vel, tf, path) in q.iter_mut() {
         if let Some(carrot_position) = path.points.get(carrot.index) {
-            let current_position: Vec2 = pos.position.translation.into();
+            let current_position: Vec2 = tf.translation.into();
             if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
                 carrot.index += 1;
                 info!("Reached carrot {}", carrot.index);

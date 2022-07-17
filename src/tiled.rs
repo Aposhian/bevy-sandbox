@@ -1,7 +1,6 @@
 use bevy::{prelude::*, render::render_resource::TextureUsages};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_rapier2d::prelude::*;
-use nalgebra::{Isometry2, UnitComplex};
 use std::f32::consts::TAU;
 use std::{path::Path, sync::Arc};
 
@@ -17,7 +16,6 @@ pub struct TiledPlugin;
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TilemapSpawnEvent>()
-            // .add_plugin(RapierRenderPlugin)
             .add_system(spawn)
             .add_system(set_texture_filters_to_nearest)
             .add_system(process_object_layers)
@@ -216,15 +214,14 @@ fn process_object_layers(
                             .get("playable")
                             .unwrap_or(&tiled::PropertyValue::BoolValue(true))
                         {
-                            tiled::PropertyValue::BoolValue(playable) => *playable,
+                            tiled::PropertyValue::BoolValue(playable) => playable,
                             _ => false,
                         };
                         spawn_event.send(SimpleFigureSpawnEvent {
                             playable,
-                            position: Isometry2::new(
-                                [object.x / rc.scale, y_pixels / rc.scale].into(),
-                                0.0,
-                            ),
+                            transform: Transform::from_translation(Vec3::new(
+                                object.x, y_pixels, 2.0,
+                            )),
                             ..Default::default()
                         })
                     }

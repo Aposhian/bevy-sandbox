@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use benimator::{Play, SpriteSheetAnimation};
 use bevy::prelude::*;
-use bevy_rapier2d::{na::Isometry2, prelude::*};
+use bevy_rapier2d::prelude::*;
 use std::f32::consts::FRAC_PI_4;
 
 use crate::camera::CameraTarget;
@@ -16,7 +16,6 @@ impl Plugin for SimpleFigurePlugin {
         app.init_resource::<SimpleFigureTextureAtlasHandle>()
             .init_resource::<SimpleFigureAnimationHandles>()
             .add_event::<SimpleFigureSpawnEvent>()
-            .add_startup_system(setup_physics)
             .add_system(animation_control)
             .add_system(spawn);
     }
@@ -141,11 +140,6 @@ impl FromWorld for SimpleFigureAnimationHandles {
     }
 }
 
-fn setup_physics(mut configuration: ResMut<RapierConfiguration>) {
-    // This is pixels per physics meter
-    configuration.scale = 32.0;
-}
-
 #[derive(Default, Component)]
 pub struct SimpleFigureTag;
 
@@ -156,12 +150,14 @@ pub struct SimpleFigureBundle {
     sprite_sheet_bundle: SpriteSheetBundle,
     animation: Handle<SpriteSheetAnimation>,
     play: Play,
-    #[bundle]
-    rigid_body_bundle: RigidBodyBundle,
-    position_sync: RigidBodyPositionSync,
-    #[bundle]
-    collider_bundle: ColliderBundle,
+    rigid_body: RigidBody,
+    collider: Collider,
+    collision_groups: CollisionGroups,
+    active_events: ActiveEvents,
+    velocity: Velocity,
     move_action: MoveAction,
+    locked_axes: LockedAxes,
+    gravity_scale: GravityScale,
 }
 
 impl Default for SimpleFigureBundle {
@@ -171,37 +167,28 @@ impl Default for SimpleFigureBundle {
             sprite_sheet_bundle: SpriteSheetBundle::default(),
             animation: Default::default(),
             play: Default::default(),
-            rigid_body_bundle: Default::default(),
-            position_sync: RigidBodyPositionSync::Discrete,
-            collider_bundle: ColliderBundle {
-                shape: ColliderShape::cuboid(0.18, 0.40).into(),
-                flags: ColliderFlags {
-                    collision_groups: InteractionGroups::new(0b0111, 0b0111),
-                    active_events: ActiveEvents::CONTACT_EVENTS,
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
-            },
+            rigid_body: Default::default(),
+            collider: Collider::cuboid(0.18, 0.40),
+            collision_groups: CollisionGroups::new(0b0111, 0b0111),
+            active_events: ActiveEvents::COLLISION_EVENTS,
             move_action: Default::default(),
+            velocity: Default::default(),
+            locked_axes: LockedAxes::ROTATION_LOCKED,
+            gravity_scale: GravityScale(0.0),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct SimpleFigureSpawnEvent {
-    pub position: Isometry2<f32>,
-    pub scale: f32,
-    pub z: f32,
+    pub transform: Transform,
     pub playable: bool,
 }
 
 impl Default for SimpleFigureSpawnEvent {
     fn default() -> Self {
         SimpleFigureSpawnEvent {
-            position: Isometry2::identity(),
-            scale: 1.0,
-            z: 2.0,
+            transform: Transform::identity(),
             playable: false,
         }
     }
@@ -226,21 +213,11 @@ fn spawn(
         let mut entity_commands = commands.spawn_bundle(SimpleFigureBundle {
             sprite_sheet_bundle: SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.handle.clone(),
-                transform: Transform::from_scale(Vec3::splat(spawn_event.scale))
-                    * Transform::from_translation(Vec3::new(0.0, 0.0, spawn_event.z)),
+                transform: spawn_event.transform,
                 ..Default::default()
             },
             animation: animations.front_stationary.clone(),
-            rigid_body_bundle: RigidBodyBundle {
-                mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
-                forces: RigidBodyForces {
-                    gravity_scale: 0.0,
-                    ..Default::default()
-                }
-                .into(),
-                position: spawn_event.position.into(),
-                ..Default::default()
-            },
+
             ..Default::default()
         });
         if spawn_event.playable {
@@ -255,7 +232,7 @@ fn animation_control(
     animation_handles: Res<SimpleFigureAnimationHandles>,
     mut query: Query<(
         &SimpleFigureTag,
-        &RigidBodyVelocityComponent,
+        &Velocity,
         &mut TextureAtlasSprite,
         &mut Handle<SpriteSheetAnimation>,
     )>,

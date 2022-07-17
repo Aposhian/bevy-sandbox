@@ -1,7 +1,6 @@
 use bevy::math::Mat2;
 use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
-use bevy_rapier2d::na::Isometry2;
 use bevy_rapier2d::prelude::*;
 use pathfinding::prelude::astar;
 use std::f32::consts::TAU;
@@ -22,13 +21,13 @@ impl Plugin for PathfindingPlugin {
 
 #[derive(Component)]
 pub struct GoalPosition {
-    pub position: Isometry2<f32>,
+    pub position: Vec2,
 }
 
 impl Default for GoalPosition {
     fn default() -> Self {
         GoalPosition {
-            position: Isometry::identity(),
+            position: Vec2::ZERO,
         }
     }
 }
