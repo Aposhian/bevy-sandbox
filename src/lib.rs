@@ -14,7 +14,7 @@ pub mod obstacle;
 // mod pathfinding;
 // mod pathfollowing;
 pub mod simple_figure;
-// pub mod tiled;
+pub mod tiled;
 
 // use crate::pathfinding::PathfindingPlugin;
 // use ai::AiPlugin;

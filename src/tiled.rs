@@ -97,7 +97,7 @@ fn process_layer(
             Vec2::new(tiled_map.tile_width as f32, tiled_map.tile_height as f32);
         layer_settings.mesh_type = TilemapMeshType::Square;
 
-        if let tiled::LayerType::Tiles(tile_layer) = layer.layer_type() {
+        if let tiled::LayerType::TileLayer(tile_layer) = layer.layer_type() {
             let finite_tile_layer = match tile_layer {
                 tiled::TileLayer::Finite(data) => data,
                 tiled::TileLayer::Infinite(_) => {
@@ -190,41 +190,37 @@ fn spawn(
 fn process_object_layers(
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
     mut spawn_event: EventWriter<SimpleFigureSpawnEvent>,
-    rc: Res<RapierConfiguration>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
             return match layer.layer_type() {
-                tiled::LayerType::Objects(object_layer) => Some(object_layer),
+                tiled::LayerType::ObjectLayer(object_layer) => Some(object_layer),
                 _ => None,
             };
         }) {
             info!("Found object layer");
             for object in object_layer.objects() {
-                if object.obj_type.as_str() == "simple_figure" {
-                    let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
+                let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
 
-                    if let ObjectShape::Rect {
-                        width: _,
-                        height: _,
-                    } = object.shape
+                if let ObjectShape::Rect {
+                    width: _,
+                    height: _,
+                } = object.shape
+                {
+                    let playable = match object
+                        .properties
+                        .get("playable")
+                        .unwrap_or(&tiled::PropertyValue::BoolValue(false))
                     {
-                        let playable = match object
-                            .properties
-                            .get("playable")
-                            .unwrap_or(&tiled::PropertyValue::BoolValue(true))
-                        {
-                            tiled::PropertyValue::BoolValue(playable) => playable,
-                            _ => false,
-                        };
-                        spawn_event.send(SimpleFigureSpawnEvent {
-                            playable,
-                            transform: Transform::from_translation(Vec3::new(
-                                object.x, y_pixels, 2.0,
-                            )),
-                            ..Default::default()
-                        })
-                    }
+                        tiled::PropertyValue::BoolValue(playable) => *playable,
+                        _ => false,
+                    };
+                    info!("Spawning simple figure");
+                    spawn_event.send(SimpleFigureSpawnEvent {
+                        playable,
+                        transform: Transform::from_xyz(object.x, y_pixels, 2.0),
+                        ..Default::default()
+                    })
                 }
             }
         }
@@ -234,17 +230,27 @@ fn process_object_layers(
 #[derive(Component, Default)]
 pub struct WallTag;
 
-#[derive(Bundle, Default)]
+#[derive(Bundle)]
 pub struct WallColliderBundle {
     #[bundle]
-    rigid_body_bundle: RigidBodyBundle,
-    #[bundle]
-    collider_bundle: ColliderBundle,
+    transform_bundle: TransformBundle,
+    rigid_body: RigidBody,
+    collider: Collider,
     wall_tag: WallTag,
 }
 
+impl Default for WallColliderBundle {
+    fn default() -> Self {
+        Self {
+            transform_bundle: TransformBundle::default(),
+            rigid_body: RigidBody::Fixed,
+            collider: Collider::default(),
+            wall_tag: WallTag,
+        }
+    }
+}
+
 fn add_colliders(
-    rc: Res<RapierConfiguration>,
     mut commands: Commands,
     tile_query: Query<&Tile>,
     mut map_query: MapQuery,
@@ -257,7 +263,6 @@ fn add_colliders(
                 if let Some(object_layer_data) = &tile.collision {
                     // Clone these so we can just move them into the closure
                     let object_layer_data = object_layer_data.clone();
-                    let physics_scale = rc.scale;
                     collider_spawners.insert(
                         id,
                         move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
@@ -265,71 +270,54 @@ fn add_colliders(
                                 .object_data()
                                 .iter()
                                 .filter_map(|object| {
-                                    let physics_tile_height =
-                                        tiled_map.tile_height as f32 / physics_scale;
-
-                                    let x = (column * tiled_map.tile_width) as f32 / physics_scale;
-                                    let y = (row * tiled_map.tile_height) as f32 / physics_scale;
-                                    let x_offset = object.x / physics_scale;
-                                    let y_offset = object.y / physics_scale;
+                                    let x = (column * tiled_map.tile_width) as f32;
+                                    let y = (row * tiled_map.tile_height) as f32;
                                     match &object.shape {
                                         ObjectShape::Rect { width, height } => {
-                                            let physics_width = width / physics_scale;
-                                            let physics_height = height / physics_scale;
                                             // The collider position is measured from the center in rapier,
                                             // but in tiled it is from the top-left corner.
                                             // In rapier2d, y increases up, but in tiled, y increases down
-                                            let mut collider_position = Isometry2::new(
-                                                [
-                                                    physics_width / 2.0 + x_offset,
-                                                    -physics_height / 2.0 - y_offset,
-                                                ]
-                                                .into(),
-                                                0.0,
-                                            );
-                                            // Tiled rotates about the top-left corner
-                                            let clockwise_rotation = object.rotation.to_radians();
-                                            let counterclockwise_rotation =
-                                                TAU - clockwise_rotation;
+                                            // let mut collider_position = Isometry2::new(
+                                            //     [
+                                            //         physics_width / 2.0 + x_offset,
+                                            //         -physics_height / 2.0 - y_offset,
+                                            //     ]
+                                            //     .into(),
+                                            //     0.0,
+                                            // );
+                                            // // Tiled rotates about the top-left corner
+                                            // let clockwise_rotation = object.rotation.to_radians();
+                                            // let counterclockwise_rotation =
+                                            //     TAU - clockwise_rotation;
 
-                                            // This needs to rotate about the top-left corner
-                                            collider_position.append_rotation_wrt_point_mut(
-                                                &UnitComplex::new(counterclockwise_rotation),
-                                                &Point::new(x_offset, -y_offset),
-                                            );
-                                            Some(
-                                                commands
-                                                    .spawn_bundle(WallColliderBundle {
-                                                        rigid_body_bundle: RigidBodyBundle {
-                                                            body_type: RigidBodyTypeComponent(
-                                                                RigidBodyType::Static,
-                                                            ),
-                                                            // Use top-left corner instead of bottom-left corner
-                                                            position: Isometry2::new(
-                                                                [x, y + physics_tile_height].into(),
-                                                                0.0,
-                                                            )
-                                                            .into(),
-                                                            ..Default::default()
-                                                        },
-                                                        collider_bundle: ColliderBundle {
-                                                            // Convert dimensions into half-extants
-                                                            shape: ColliderShape::cuboid(
-                                                                physics_width / 2.0,
-                                                                physics_height / 2.0,
-                                                            )
-                                                            .into(),
-                                                            position: collider_position.into(),
-                                                            ..Default::default()
-                                                        },
-                                                        ..Default::default()
-                                                    })
-                                                    .insert(ColliderDebugRender::with_id(
-                                                        id as usize,
-                                                    ))
-                                                    .insert(ColliderPositionSync::Discrete)
-                                                    .id(),
-                                            )
+                                            // // This needs to rotate about the top-left corner
+                                            // collider_position.append_rotation_wrt_point_mut(
+                                            //     &UnitComplex::new(counterclockwise_rotation),
+                                            //     &Point::new(x_offset, -y_offset),
+                                            // );
+
+                                            //         // Use top-left corner instead of bottom-left corner
+                                            //         position: Isometry2::new(
+                                            //         [x, y + physics_tile_height].into(),
+                                            //         0.0,
+                                            //     )
+                                            // },
+                                            //     position: collider_position.into(),
+                                            //     ..Default::default()
+
+                                            // Some(
+                                            //     commands
+                                            //         .spawn_bundle(WallColliderBundle {
+                                            //             collider: Collider::cuboid(width / 2.0, height / 2.0),
+                                            //             transform_bundle: TransformBundle {
+                                            //                 local: Transform::identity(), // TODO: use actual transform
+                                            //                 ..Default::default()
+                                            //             },
+                                            //             ..Default::default()
+                                            //         })
+                                            //         .id()
+                                            // )
+                                            None
                                         }
                                         _ => {
                                             warn!("Unsupported object shape: {:?}", object.shape);
