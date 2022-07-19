@@ -33,7 +33,7 @@ fn keyboard(
     mut query: Query<&mut MoveAction, With<PlayerTag>>,
 ) {
     for mut move_action in query.iter_mut() {
-        let mut desired_velocity = Vec2::splat(0.0);
+        let mut desired_velocity = Vec2::ZERO;
 
         if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
             desired_velocity.y += 1.0;
@@ -51,11 +51,7 @@ fn keyboard(
             desired_velocity.x += 1.0;
         }
 
-        move_action.desired_velocity = if desired_velocity.length_squared() != 0.0 {
-            desired_velocity.normalize()
-        } else {
-            desired_velocity
-        };
+        move_action.desired_velocity = desired_velocity.normalize_or_zero();
     }
 }
 
@@ -94,7 +90,7 @@ fn mouse_aim(
                         transform: Transform::from_translation(
                             (player_pos + direction).extend(2.0),
                         ),
-                        velocity: direction * 10.0,
+                        velocity: direction * 300.0,
                         ..Default::default()
                     });
                 }
@@ -106,6 +102,6 @@ fn mouse_aim(
 fn movement(mut query: Query<(&MoveAction, &mut Velocity)>) {
     for (move_action, mut velocity) in query.iter_mut() {
         // TODO: use forces or impulses rather than setting velocity
-        velocity.linvel = (move_action.desired_velocity * 5.0).into();
+        velocity.linvel = (move_action.desired_velocity * 150.0).into();
     }
 }

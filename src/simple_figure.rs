@@ -168,7 +168,7 @@ impl Default for SimpleFigureBundle {
             animation: Default::default(),
             play: Default::default(),
             rigid_body: Default::default(),
-            collider: Collider::cuboid(0.18, 0.40),
+            collider: Collider::cuboid(15.0, 20.0),
             collision_groups: CollisionGroups::new(0b0111, 0b0111),
             active_events: ActiveEvents::COLLISION_EVENTS,
             move_action: Default::default(),
