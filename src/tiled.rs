@@ -250,6 +250,47 @@ impl Default for WallColliderBundle {
     }
 }
 
+fn spawn_wall_collider(
+    commands: &mut Commands,
+    object: &tiled::ObjectData,
+    x: f32,
+    y: f32,
+) -> Option<Entity> {
+    match &object.shape {
+        ObjectShape::Rect { width, height } => {
+            info!("found a rect");
+            // The collider position is measured from the center in rapier,
+            // but in tiled it is from the top-left corner.
+            // In rapier2d, y increases up, but in tiled, y increases down
+            // tiled also considers rotation around the top left corner, rather than the center
+            let mut tf = Transform::from_xyz(x + *width / 2.0, y - *height / 2.0, 0.0);
+
+            // Tiled rotates about the top-left corner, clockwise
+            let cw_rotation = object.rotation.to_radians();
+            let ccw_rotation = TAU - cw_rotation;
+
+            tf.rotate_around(Vec3::new(x, y, 0.0), Quat::from_rotation_z(ccw_rotation));
+
+            Some(
+                commands
+                    .spawn_bundle(WallColliderBundle {
+                        collider: Collider::cuboid(width / 2.0, height / 2.0),
+                        transform_bundle: TransformBundle {
+                            local: tf,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    })
+                    .id(),
+            )
+        }
+        _ => {
+            warn!("Unsupported object shape: {:?}", object.shape);
+            None
+        }
+    }
+}
+
 fn add_colliders(
     mut commands: Commands,
     tile_query: Query<&Tile>,
@@ -261,69 +302,19 @@ fn add_colliders(
         if let Some(tileset) = tiled_map.tilesets().first() {
             for (id, tile) in tileset.tiles() {
                 if let Some(object_layer_data) = &tile.collision {
+                    info!("Found object layer for tile id {}", id);
                     // Clone these so we can just move them into the closure
                     let object_layer_data = object_layer_data.clone();
                     collider_spawners.insert(
                         id,
                         move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
+                            let x = (column * tiled_map.tile_width) as f32;
+                            let y = (row * tiled_map.tile_height) as f32;
                             object_layer_data
                                 .object_data()
                                 .iter()
-                                .filter_map(|object| {
-                                    let x = (column * tiled_map.tile_width) as f32;
-                                    let y = (row * tiled_map.tile_height) as f32;
-                                    match &object.shape {
-                                        ObjectShape::Rect { width, height } => {
-                                            // The collider position is measured from the center in rapier,
-                                            // but in tiled it is from the top-left corner.
-                                            // In rapier2d, y increases up, but in tiled, y increases down
-                                            // let mut collider_position = Isometry2::new(
-                                            //     [
-                                            //         physics_width / 2.0 + x_offset,
-                                            //         -physics_height / 2.0 - y_offset,
-                                            //     ]
-                                            //     .into(),
-                                            //     0.0,
-                                            // );
-                                            // // Tiled rotates about the top-left corner
-                                            // let clockwise_rotation = object.rotation.to_radians();
-                                            // let counterclockwise_rotation =
-                                            //     TAU - clockwise_rotation;
-
-                                            // // This needs to rotate about the top-left corner
-                                            // collider_position.append_rotation_wrt_point_mut(
-                                            //     &UnitComplex::new(counterclockwise_rotation),
-                                            //     &Point::new(x_offset, -y_offset),
-                                            // );
-
-                                            //         // Use top-left corner instead of bottom-left corner
-                                            //         position: Isometry2::new(
-                                            //         [x, y + physics_tile_height].into(),
-                                            //         0.0,
-                                            //     )
-                                            // },
-                                            //     position: collider_position.into(),
-                                            //     ..Default::default()
-
-                                            // Some(
-                                            //     commands
-                                            //         .spawn_bundle(WallColliderBundle {
-                                            //             collider: Collider::cuboid(width / 2.0, height / 2.0),
-                                            //             transform_bundle: TransformBundle {
-                                            //                 local: Transform::identity(), // TODO: use actual transform
-                                            //                 ..Default::default()
-                                            //             },
-                                            //             ..Default::default()
-                                            //         })
-                                            //         .id()
-                                            // )
-                                            None
-                                        }
-                                        _ => {
-                                            warn!("Unsupported object shape: {:?}", object.shape);
-                                            None
-                                        }
-                                    }
+                                .filter_map(|object_data| {
+                                    spawn_wall_collider(commands, object_data, x, y)
                                 })
                                 .collect()
                         },
@@ -334,15 +325,23 @@ fn add_colliders(
             }
         }
 
-        for x in 0..tiled_map.width {
-            for y in 0..tiled_map.height {
-                if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), MAP_ID, 1) {
-                    if let Ok(tile) = tile_query.get(tile_entity) {
-                        if let Some(spawner) = collider_spawners.get(&(tile.texture_index as u32)) {
-                            let object_entities = spawner(&mut commands, x, y);
-                            commands
-                                .entity(tile_entity)
-                                .push_children(object_entities.as_slice());
+        for layer in tiled_map.layers() {
+            for x in 0..tiled_map.width {
+                for y in 0..tiled_map.height {
+                    if let Ok(tile_entity) =
+                        map_query.get_tile_entity(TilePos(x, y), MAP_ID, layer.id() as u16)
+                    {
+                        info!("found tile entity");
+                        if let Ok(tile) = tile_query.get(tile_entity) {
+                            if let Some(spawner) =
+                                collider_spawners.get(&(tile.texture_index as u32))
+                            {
+                                info!("spawning objects for tile");
+                                let object_entities = spawner(&mut commands, x, y);
+                                commands
+                                    .entity(tile_entity)
+                                    .push_children(object_entities.as_slice());
+                            }
                         }
                     }
                 }

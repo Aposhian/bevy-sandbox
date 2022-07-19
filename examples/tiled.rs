@@ -2,6 +2,7 @@
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use bevy_rapier2d::prelude::*;
 use bevy_sandbox::{
     tiled::{TiledPlugin, TilemapSpawnEvent},
     SandboxPlugins,
@@ -13,6 +14,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(SandboxPlugins)
         .add_plugin(TiledPlugin)
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_startup_system(spawn_tilemap)
         .run();
