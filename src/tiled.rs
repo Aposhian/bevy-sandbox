@@ -31,6 +31,7 @@ pub struct TiledMapBundle {
     pub ecs_map: bevy_ecs_tilemap::Map,
     pub tiled_map: TiledMapComponent,
     pub transform: Transform,
+    global_transform: GlobalTransform,
 }
 
 pub struct TilemapSpawnEvent {
@@ -183,6 +184,7 @@ fn spawn(
             ecs_map,
             tiled_map: TiledMapComponent(tiled_map),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            global_transform: GlobalTransform::default(),
         });
     }
 }
@@ -258,7 +260,6 @@ fn spawn_wall_collider(
 ) -> Option<Entity> {
     match &object.shape {
         ObjectShape::Rect { width, height } => {
-            info!("found a rect");
             // The collider position is measured from the center in rapier,
             // but in tiled it is from the top-left corner.
             // In rapier2d, y increases up, but in tiled, y increases down
@@ -331,12 +332,10 @@ fn add_colliders(
                     if let Ok(tile_entity) =
                         map_query.get_tile_entity(TilePos(x, y), MAP_ID, layer.id() as u16)
                     {
-                        info!("found tile entity");
                         if let Ok(tile) = tile_query.get(tile_entity) {
                             if let Some(spawner) =
                                 collider_spawners.get(&(tile.texture_index as u32))
                             {
-                                info!("spawning objects for tile");
                                 let object_entities = spawner(&mut commands, x, y);
                                 commands
                                     .entity(tile_entity)
