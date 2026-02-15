@@ -15,7 +15,7 @@ fn setup(mut commands: Commands) {
         .line_to(Vec2::X * 100.0)
         .move_to(Vec2::X * 100.0)
         .line_to(Vec2::new(100.0, 100.0))
-        .build();
+        .close();
 
     commands.spawn(Camera2d);
     commands.spawn((
