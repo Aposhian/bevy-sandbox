@@ -1,5 +1,5 @@
+use avian2d::prelude::*;
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 
 use crate::ecs::DespawnEvent;
 
@@ -7,7 +7,7 @@ pub struct HealthPlugin;
 
 impl Plugin for HealthPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(damage).add_system(health_despawner);
+        app.add_systems(Update, (damage, health_despawner));
     }
 }
 
@@ -30,11 +30,11 @@ pub struct CollisionDamage {
 
 fn health_despawner(
     q: Query<(Entity, &Health), Changed<Health>>,
-    mut despawn: EventWriter<DespawnEvent>,
+    mut despawn: MessageWriter<DespawnEvent>,
 ) {
     for (entity, health) in q.iter() {
         if health.current <= 0 {
-            despawn.send(DespawnEvent(entity));
+            despawn.write(DespawnEvent(entity));
         }
     }
 }
@@ -42,15 +42,16 @@ fn health_despawner(
 fn damage(
     damager_query: Query<&CollisionDamage>,
     mut health_query: Query<&mut Health>,
-    mut contact_events: EventReader<ContactEvent>,
+    collisions: Collisions,
 ) {
-    for contact_event in contact_events.iter() {
-        if let ContactEvent::Started(c1, c2) = contact_event {
-            for (damager, damageable) in [(c1, c2), (c2, c1)] {
-                if let Ok(CollisionDamage { damage }) = damager_query.get(damager.entity()) {
-                    if let Ok(mut health) = health_query.get_mut(damageable.entity()) {
-                        health.current -= damage;
-                    }
+    for contacts in collisions.iter() {
+        let Some(e1) = contacts.body1 else { continue; };
+        let Some(e2) = contacts.body2 else { continue; };
+
+        for (damager, damageable) in [(e1, e2), (e2, e1)] {
+            if let Ok(CollisionDamage { damage }) = damager_query.get(damager) {
+                if let Ok(mut health) = health_query.get_mut(damageable) {
+                    health.current -= damage;
                 }
             }
         }

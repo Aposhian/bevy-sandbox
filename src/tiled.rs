@@ -1,64 +1,32 @@
-use bevy::{prelude::*, render::render_resource::TextureUsages};
+use avian2d::prelude::*;
+use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
-use bevy_rapier2d::prelude::*;
-use nalgebra::{Isometry2, UnitComplex};
 use std::f32::consts::TAU;
-use std::{path::Path, sync::Arc};
+use std::path::Path;
+use std::sync::Arc;
 
 use tiled::{Loader, ObjectShape, Tileset};
 
-use crate::simple_figure::SimpleFigureSpawnEvent;
-
-// TODO: change this from a constant so we can handle multiple maps
-const MAP_ID: u16 = 0u16;
+use crate::simple_figure::{GameLayer, SimpleFigureSpawnEvent};
 
 pub struct TiledPlugin;
 
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<TilemapSpawnEvent>()
-            // .add_plugin(RapierRenderPlugin)
-            .add_system(spawn)
-            .add_system(set_texture_filters_to_nearest)
-            .add_system(process_object_layers)
-            .add_system(add_colliders);
+        app.add_message::<TilemapSpawnEvent>()
+            .add_systems(Update, (spawn, process_object_layers, add_colliders));
     }
 }
 
 #[derive(Component)]
 pub struct TiledMapComponent(tiled::Map);
 
-#[derive(Bundle)]
-pub struct TiledMapBundle {
-    pub ecs_map: bevy_ecs_tilemap::Map,
-    pub tiled_map: TiledMapComponent,
-    pub transform: Transform,
-}
-
+#[derive(Message)]
 pub struct TilemapSpawnEvent {
     pub path: &'static Path,
 }
 
-pub fn set_texture_filters_to_nearest(
-    mut texture_events: EventReader<AssetEvent<Image>>,
-    mut textures: ResMut<Assets<Image>>,
-) {
-    // quick and dirty, run this for all textures anytime a texture is created.
-    for event in texture_events.iter() {
-        match event {
-            AssetEvent::Created { handle } => {
-                if let Some(mut texture) = textures.get_mut(handle) {
-                    texture.texture_descriptor.usage = TextureUsages::TEXTURE_BINDING
-                        | TextureUsages::COPY_SRC
-                        | TextureUsages::COPY_DST;
-                }
-            }
-            _ => (),
-        }
-    }
-}
-
-fn load_texture_atlas(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
+fn load_texture(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
     if let Some(image) = &tileset.image {
         let path = std::fs::canonicalize(&image.source).unwrap();
         info!("loading texture: {path:?}");
@@ -70,140 +38,141 @@ fn load_texture_atlas(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Opt
 
 fn process_layer(
     commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
     layer: &tiled::Layer,
     tileset: &Arc<Tileset>,
     texture_handle: &Handle<Image>,
     tiled_map: &tiled::Map,
-    ecs_map: &mut bevy_ecs_tilemap::Map,
+    tilemap_entity: Entity,
+    layer_index: usize,
 ) {
     info!("loading layer {:?}", layer.id());
-    if layer.visible {
-        info!("layer {:?} is visible", layer.id());
-        const CHUNK_SIZE: u32 = 256;
+    if !layer.visible {
+        return;
+    }
+    info!("layer {:?} is visible", layer.id());
 
-        let mut layer_settings = LayerSettings::new(
-            MapSize(
-                (tiled_map.width as f32 / CHUNK_SIZE as f32).ceil() as u32,
-                (tiled_map.height as f32 / CHUNK_SIZE as f32).ceil() as u32,
-            ),
-            ChunkSize(CHUNK_SIZE, CHUNK_SIZE),
-            TileSize(tileset.tile_width as f32, tileset.tile_height as f32),
-            // TODO: don't unwrap this
-            TextureSize(
-                tileset.image.clone().unwrap().width as f32,
-                tileset.image.clone().unwrap().height as f32,
-            ),
-        );
-        layer_settings.grid_size =
-            Vec2::new(tiled_map.tile_width as f32, tiled_map.tile_height as f32);
-        layer_settings.mesh_type = TilemapMeshType::Square;
+    let tiled::LayerType::Tiles(tile_layer) = layer.layer_type() else {
+        return;
+    };
 
-        if let tiled::LayerType::Tiles(tile_layer) = layer.layer_type() {
-            let finite_tile_layer = match tile_layer {
-                tiled::TileLayer::Finite(data) => data,
-                tiled::TileLayer::Infinite(_) => {
-                    panic!("infinite tilemaps not supported");
-                }
+    let tiled::TileLayer::Finite(finite_tile_layer) = tile_layer else {
+        panic!("infinite tilemaps not supported");
+    };
+
+    let map_size = TilemapSize {
+        x: tiled_map.width,
+        y: tiled_map.height,
+    };
+    let tile_size = TilemapTileSize {
+        x: tileset.tile_width as f32,
+        y: tileset.tile_height as f32,
+    };
+    let grid_size = TilemapGridSize {
+        x: tiled_map.tile_width as f32,
+        y: tiled_map.tile_height as f32,
+    };
+
+    let layer_entity = commands.spawn_empty().id();
+    let mut tile_storage = TileStorage::empty(map_size);
+
+    for x in 0..tiled_map.width {
+        for y in 0..tiled_map.height {
+            // Tiled y=0 is top, Bevy y=0 is bottom
+            let tiled_y = if tiled_map.orientation == tiled::Orientation::Orthogonal {
+                (tiled_map.height - 1) - y
+            } else {
+                y
             };
 
-            let layer_entity = LayerBuilder::<TileBundle>::new_batch(
-                commands,
-                layer_settings.clone(),
-                meshes,
-                texture_handle.clone(),
-                MAP_ID,
-                layer.id() as u16,
-                |mut tile_pos| {
-                    if tile_pos.0 >= tiled_map.width || tile_pos.1 >= tiled_map.height {
-                        return None;
-                    }
-
-                    if tiled_map.orientation == tiled::Orientation::Orthogonal {
-                        tile_pos.1 = (tiled_map.height - 1) as u32 - tile_pos.1;
-                    }
-
-                    let tile = &finite_tile_layer
-                        .get_tile(tile_pos.0 as i32, tile_pos.1 as i32)
-                        .unwrap();
-
-                    let tile = Tile {
-                        texture_index: tile.id() as u16,
-                        flip_x: tile.flip_h,
-                        flip_y: tile.flip_v,
-                        flip_d: tile.flip_d,
-                        ..Default::default()
-                    };
-
-                    Some(TileBundle {
-                        tile,
+            if let Some(tile) = finite_tile_layer.get_tile(x as i32, tiled_y as i32) {
+                let tile_pos = TilePos { x, y };
+                let tile_entity = commands
+                    .spawn(TileBundle {
+                        position: tile_pos,
+                        tilemap_id: TilemapId(layer_entity),
+                        texture_index: TileTextureIndex(tile.id()),
+                        flip: TileFlip {
+                            x: tile.flip_h,
+                            y: tile.flip_v,
+                            d: tile.flip_d,
+                        },
                         ..Default::default()
                     })
-                },
-            );
-
-            ecs_map.add_layer(commands, layer.id() as u16, layer_entity);
-            commands.entity(layer_entity).insert(Transform::from_xyz(
-                layer.offset_y,
-                -layer.offset_x,
-                layer.id() as f32,
-            ));
-        };
+                    .id();
+                tile_storage.set(&tile_pos, tile_entity);
+            }
+        }
     }
+
+    commands.entity(layer_entity).insert(TilemapBundle {
+        grid_size,
+        map_type: TilemapType::Square,
+        size: map_size,
+        storage: tile_storage,
+        texture: TilemapTexture::Single(texture_handle.clone()),
+        tile_size,
+        transform: Transform::from_xyz(
+            layer.offset_y,
+            -layer.offset_x,
+            layer_index as f32,
+        ),
+        ..Default::default()
+    });
+
+    // Associate the layer with the map entity
+    commands.entity(tilemap_entity).add_child(layer_entity);
 }
 
 /// Spawn entities in response to spawn events
 fn spawn(
-    mut spawn_events: EventReader<TilemapSpawnEvent>,
+    mut spawn_events: MessageReader<TilemapSpawnEvent>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for spawn_event in spawn_events.iter() {
+    for spawn_event in spawn_events.read() {
         let mut loader = Loader::new();
         let tiled_map = loader.load_tmx_map(spawn_event.path).unwrap();
 
-        let map_entity = commands.spawn().id();
-        let mut ecs_map = bevy_ecs_tilemap::Map::new(MAP_ID, map_entity);
+        let tilemap_entity = commands.spawn_empty().id();
 
         let tileset = tiled_map.tilesets().first().unwrap();
-        // TODO: make this handle multiple textures
-        let texture_handle = load_texture_atlas(&tileset, &asset_server).unwrap();
+        let texture_handle = load_texture(tileset, &asset_server).unwrap();
 
-        for layer in tiled_map.layers() {
+        for (layer_index, layer) in tiled_map.layers().enumerate() {
             process_layer(
                 &mut commands,
-                &mut meshes,
                 &layer,
-                &tileset,
+                tileset,
                 &texture_handle,
                 &tiled_map,
-                &mut ecs_map,
+                tilemap_entity,
+                layer_index,
             );
         }
-        commands.spawn_bundle(TiledMapBundle {
-            ecs_map,
-            tiled_map: TiledMapComponent(tiled_map),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        });
+
+        commands
+            .entity(tilemap_entity)
+            .insert((
+                TiledMapComponent(tiled_map),
+                Transform::from_xyz(0.0, 0.0, 0.0),
+            ));
     }
 }
 
 fn process_object_layers(
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
-    mut spawn_event: EventWriter<SimpleFigureSpawnEvent>,
-    rc: Res<RapierConfiguration>,
+    mut spawn_event: MessageWriter<SimpleFigureSpawnEvent>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
-            return match layer.layer_type() {
+            match layer.layer_type() {
                 tiled::LayerType::Objects(object_layer) => Some(object_layer),
                 _ => None,
-            };
+            }
         }) {
             info!("Found object layer");
             for object in object_layer.objects() {
-                if object.obj_type.as_str() == "simple_figure" {
+                if object.user_type.as_str() == "simple_figure" {
                     let y_pixels = (tiled_map.height * tiled_map.tile_height) as f32 - object.y;
 
                     if let ObjectShape::Rect {
@@ -219,14 +188,11 @@ fn process_object_layers(
                             tiled::PropertyValue::BoolValue(playable) => *playable,
                             _ => false,
                         };
-                        spawn_event.send(SimpleFigureSpawnEvent {
+                        spawn_event.write(SimpleFigureSpawnEvent {
                             playable,
-                            position: Isometry2::new(
-                                [object.x / rc.scale, y_pixels / rc.scale].into(),
-                                0.0,
-                            ),
+                            position: Vec2::new(object.x, y_pixels),
                             ..Default::default()
-                        })
+                        });
                     }
                 }
             }
@@ -237,127 +203,64 @@ fn process_object_layers(
 #[derive(Component, Default)]
 pub struct WallTag;
 
-#[derive(Bundle, Default)]
-pub struct WallColliderBundle {
-    #[bundle]
-    rigid_body_bundle: RigidBodyBundle,
-    #[bundle]
-    collider_bundle: ColliderBundle,
-    wall_tag: WallTag,
-}
-
 fn add_colliders(
-    rc: Res<RapierConfiguration>,
     mut commands: Commands,
-    tile_query: Query<&Tile>,
-    mut map_query: MapQuery,
+    tile_query: Query<(&TilePos, &TileTextureIndex, &TilemapId)>,
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
-        let mut collider_spawners = std::collections::HashMap::new();
-        if let Some(tileset) = tiled_map.tilesets().first() {
-            for (id, tile) in tileset.tiles() {
-                if let Some(object_layer_data) = &tile.collision {
-                    // Clone these so we can just move them into the closure
-                    let object_layer_data = object_layer_data.clone();
-                    let physics_scale = rc.scale;
-                    collider_spawners.insert(
-                        id,
-                        move |commands: &mut Commands, column: u32, row: u32| -> Vec<Entity> {
-                            object_layer_data
-                                .object_data()
-                                .iter()
-                                .filter_map(|object| {
-                                    let physics_tile_height =
-                                        tiled_map.tile_height as f32 / physics_scale;
+        let Some(tileset) = tiled_map.tilesets().first() else {
+            continue;
+        };
 
-                                    let x = (column * tiled_map.tile_width) as f32 / physics_scale;
-                                    let y = (row * tiled_map.tile_height) as f32 / physics_scale;
-                                    let x_offset = object.x / physics_scale;
-                                    let y_offset = object.y / physics_scale;
-                                    match &object.shape {
-                                        ObjectShape::Rect { width, height } => {
-                                            let physics_width = width / physics_scale;
-                                            let physics_height = height / physics_scale;
-                                            // The collider position is measured from the center in rapier,
-                                            // but in tiled it is from the top-left corner.
-                                            // In rapier2d, y increases up, but in tiled, y increases down
-                                            let mut collider_position = Isometry2::new(
-                                                [
-                                                    physics_width / 2.0 + x_offset,
-                                                    -physics_height / 2.0 - y_offset,
-                                                ]
-                                                .into(),
-                                                0.0,
-                                            );
-                                            // Tiled rotates about the top-left corner
-                                            let clockwise_rotation = object.rotation.to_radians();
-                                            let counterclockwise_rotation =
-                                                TAU - clockwise_rotation;
-
-                                            // This needs to rotate about the top-left corner
-                                            collider_position.append_rotation_wrt_point_mut(
-                                                &UnitComplex::new(counterclockwise_rotation),
-                                                &Point::new(x_offset, -y_offset),
-                                            );
-                                            Some(
-                                                commands
-                                                    .spawn_bundle(WallColliderBundle {
-                                                        rigid_body_bundle: RigidBodyBundle {
-                                                            body_type: RigidBodyTypeComponent(
-                                                                RigidBodyType::Static,
-                                                            ),
-                                                            // Use top-left corner instead of bottom-left corner
-                                                            position: Isometry2::new(
-                                                                [x, y + physics_tile_height].into(),
-                                                                0.0,
-                                                            )
-                                                            .into(),
-                                                            ..Default::default()
-                                                        },
-                                                        collider_bundle: ColliderBundle {
-                                                            // Convert dimensions into half-extants
-                                                            shape: ColliderShape::cuboid(
-                                                                physics_width / 2.0,
-                                                                physics_height / 2.0,
-                                                            )
-                                                            .into(),
-                                                            position: collider_position.into(),
-                                                            ..Default::default()
-                                                        },
-                                                        ..Default::default()
-                                                    })
-                                                    .insert(ColliderDebugRender::with_id(
-                                                        id as usize,
-                                                    ))
-                                                    .insert(ColliderPositionSync::Discrete)
-                                                    .id(),
-                                            )
-                                        }
-                                        _ => {
-                                            warn!("Unsupported object shape: {:?}", object.shape);
-                                            None
-                                        }
-                                    }
-                                })
-                                .collect()
-                        },
-                    );
-                } else {
-                    warn!("No collision data for tile id: {id}");
-                }
+        // Build a map of tile ID -> collision data
+        let mut collider_data: std::collections::HashMap<u32, Vec<_>> = std::collections::HashMap::new();
+        for (id, tile) in tileset.tiles() {
+            if let Some(object_layer_data) = &tile.collision {
+                collider_data.insert(id, object_layer_data.object_data().to_vec());
             }
         }
 
-        for x in 0..tiled_map.width {
-            for y in 0..tiled_map.height {
-                if let Ok(tile_entity) = map_query.get_tile_entity(TilePos(x, y), MAP_ID, 1) {
-                    if let Ok(tile) = tile_query.get(tile_entity) {
-                        if let Some(spawner) = collider_spawners.get(&(tile.texture_index as u32)) {
-                            let object_entities = spawner(&mut commands, x, y);
-                            commands
-                                .entity(tile_entity)
-                                .push_children(object_entities.as_slice());
+        for (tile_pos, texture_index, _tilemap_id) in tile_query.iter() {
+            if let Some(objects) = collider_data.get(&texture_index.0) {
+                let physics_tile_height = tiled_map.tile_height as f32;
+
+                let x = (tile_pos.x * tiled_map.tile_width) as f32;
+                let y = (tile_pos.y * tiled_map.tile_height) as f32;
+
+                for object in objects {
+                    let x_offset = object.x;
+                    let y_offset = object.y;
+                    match &object.shape {
+                        ObjectShape::Rect { width, height } => {
+                            // In Tiled, position is top-left corner; in Bevy, position is center.
+                            // In Tiled, y increases down; in Bevy, y increases up.
+                            let center_x = x + x_offset + width / 2.0;
+                            let center_y = y + physics_tile_height - y_offset - height / 2.0;
+
+                            let clockwise_rotation = object.rotation.to_radians();
+                            let counterclockwise_rotation = TAU - clockwise_rotation;
+
+                            commands.spawn((
+                                WallTag,
+                                RigidBody::Static,
+                                Collider::rectangle(*width, *height),
+                                CollisionLayers::new(
+                                    LayerMask::from([GameLayer::Wall]),
+                                    LayerMask::from([
+                                        GameLayer::Character,
+                                        GameLayer::Ball,
+                                        GameLayer::Wall,
+                                    ]),
+                                ),
+                                Transform::from_translation(Vec3::new(center_x, center_y, 0.0))
+                                    .with_rotation(Quat::from_rotation_z(
+                                        counterclockwise_rotation,
+                                    )),
+                            ));
+                        }
+                        _ => {
+                            warn!("Unsupported object shape: {:?}", object.shape);
                         }
                     }
                 }

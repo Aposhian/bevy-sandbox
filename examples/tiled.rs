@@ -10,16 +10,15 @@ use std::path::Path;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(SandboxPlugins)
-        .add_plugin(TiledPlugin)
-        .add_plugin(TilemapPlugin)
-        .add_startup_system(spawn_tilemap)
+        .add_plugins((TiledPlugin, TilemapPlugin))
+        .add_systems(Startup, spawn_tilemap)
         .run();
 }
 
-fn spawn_tilemap(mut tilemap_spawn_event: EventWriter<TilemapSpawnEvent>) {
-    tilemap_spawn_event.send(TilemapSpawnEvent {
+fn spawn_tilemap(mut tilemap_spawn_event: MessageWriter<TilemapSpawnEvent>) {
+    tilemap_spawn_event.write(TilemapSpawnEvent {
         path: Path::new("assets/example.tmx"),
     })
 }

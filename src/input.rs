@@ -1,21 +1,15 @@
 use crate::ball::BallSpawnEvent;
+use crate::PIXELS_PER_METER;
+use avian2d::prelude::*;
 use bevy::math::Vec3Swizzles;
-use bevy::math::Vec4Swizzles;
-use bevy::render::camera::Camera;
-use bevy::{
-    input::{keyboard::KeyCode, Input},
-    prelude::*,
-};
-use bevy_rapier2d::prelude::*;
-use nalgebra::Isometry2;
+use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 
 pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(keyboard)
-            .add_system(mouse_aim)
-            .add_system(movement);
+        app.add_systems(Update, (keyboard, mouse_aim, movement));
     }
 }
 
@@ -30,25 +24,25 @@ pub struct MoveAction {
 pub struct PlayerTag;
 
 fn keyboard(
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut query: Query<&mut MoveAction, With<PlayerTag>>,
 ) {
     for mut move_action in query.iter_mut() {
         let mut desired_velocity = Vec2::splat(0.0);
 
-        if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
+        if keyboard_input.pressed(KeyCode::KeyW) || keyboard_input.pressed(KeyCode::ArrowUp) {
             desired_velocity.y += 1.0;
         }
 
-        if keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down) {
+        if keyboard_input.pressed(KeyCode::KeyS) || keyboard_input.pressed(KeyCode::ArrowDown) {
             desired_velocity.y -= 1.0;
         }
 
-        if keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left) {
+        if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
             desired_velocity.x -= 1.0;
         }
 
-        if keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right) {
+        if keyboard_input.pressed(KeyCode::KeyD) || keyboard_input.pressed(KeyCode::ArrowRight) {
             desired_velocity.x += 1.0;
         }
 
@@ -61,51 +55,45 @@ fn keyboard(
 }
 
 fn mouse_aim(
-    buttons: Res<Input<MouseButton>>,
-    windows: Res<Windows>,
-    rapier_config: Res<RapierConfiguration>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
     player_query: Query<&GlobalTransform, With<PlayerTag>>,
-    camera_query: Query<&Transform, With<Camera>>,
-    mut ball_spawn_event: EventWriter<BallSpawnEvent>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
+    mut ball_spawn_event: MessageWriter<BallSpawnEvent>,
 ) {
+    let Ok(window) = window_query.single() else {
+        return;
+    };
+    let Ok((camera, camera_transform)) = camera_query.single() else {
+        return;
+    };
+
     for player_tf in player_query.iter() {
-        if let Some(window) = windows.get_primary() {
-            if let Some(cursor_pos) = window.cursor_position() {
-                if buttons.just_pressed(MouseButton::Left) {
-                    let size = Vec2::new(window.width() as f32, window.height() as f32);
+        if let Some(cursor_pos) = window.cursor_position() {
+            if buttons.just_pressed(MouseButton::Left) {
+                // Convert cursor screen position to world position
+                let Ok(cursor_world_pos) =
+                    camera.viewport_to_world_2d(camera_transform, cursor_pos)
+                else {
+                    continue;
+                };
 
-                    // https://bevy-cheatbook.github.io/cookbook/cursor2world.html
-                    // the default orthographic projection is in pixels from the center;
-                    // just undo the translation
-                    let p = cursor_pos - size / 2.0;
+                let player_pos = player_tf.translation().xy();
+                let direction = (cursor_world_pos - player_pos).normalize_or_zero();
 
-                    // assuming there is exactly one main camera entity, so this is OK
-                    let camera_transform = camera_query.single();
+                info!("goal_position: {:?}", cursor_world_pos);
 
-                    // apply the camera transform
-                    let cursor_world_pos =
-                        camera_transform.compute_matrix() * p.extend(0.0).extend(1.0);
-
-                    let player_pos = (player_tf.translation / rapier_config.scale).xy();
-                    let cursor_real_pos = (cursor_world_pos / rapier_config.scale).xy();
-                    let direction = (cursor_real_pos - player_pos).normalize_or_zero();
-
-                    info!("goal_position: {:?}", cursor_real_pos);
-
-                    ball_spawn_event.send(BallSpawnEvent {
-                        position: Isometry2::new((player_pos + direction * 1.0).into(), 0.0),
-                        velocity: direction * 10.0,
-                        ..Default::default()
-                    });
-                }
+                ball_spawn_event.write(BallSpawnEvent {
+                    position: player_pos + direction * PIXELS_PER_METER,
+                    velocity: direction * 10.0 * PIXELS_PER_METER,
+                });
             }
         }
     }
 }
 
-fn movement(mut query: Query<(&MoveAction, &mut RigidBodyVelocityComponent)>) {
+fn movement(mut query: Query<(&MoveAction, &mut LinearVelocity)>) {
     for (move_action, mut velocity) in query.iter_mut() {
-        // TODO: use forces or impulses rather than setting velocity
-        velocity.linvel = (move_action.desired_velocity * 5.0).into();
+        velocity.0 = move_action.desired_velocity * 5.0 * PIXELS_PER_METER;
     }
 }

@@ -1,8 +1,7 @@
-use benimator::AnimationPlugin;
+use avian2d::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 use bevy_prototype_lyon::plugin::ShapePlugin;
-use bevy_rapier2d::prelude::*;
 
 mod ai;
 mod ball;
@@ -25,23 +24,37 @@ use health::HealthPlugin;
 use input::InputPlugin;
 use pathfollowing::PathfollowingPlugin;
 use simple_figure::SimpleFigurePlugin;
+
+/// Pixels per physics meter, used to convert between world (pixel) coordinates
+/// and game-logic "meter" coordinates.
+pub const PIXELS_PER_METER: f32 = 32.0;
+
 pub struct SandboxPlugins;
 
+/// Wrapper plugin to add avian2d PhysicsPlugins (which is a PluginGroup)
+struct PhysicsSetup;
+
+impl Plugin for PhysicsSetup {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(PhysicsPlugins::default().with_length_unit(PIXELS_PER_METER));
+    }
+}
+
 impl PluginGroup for SandboxPlugins {
-    fn build(&mut self, group: &mut PluginGroupBuilder) {
-        group.add(AnimationPlugin);
-        group.add(RapierPhysicsPlugin::<NoUserData>::default());
-        group.add(DefaultResources);
-        group.add(InputPlugin);
-        group.add(SimpleFigurePlugin);
-        group.add(CameraPlugin);
-        group.add(BallPlugin);
-        group.add(HealthPlugin);
-        group.add(PathfindingPlugin);
-        group.add(ShapePlugin);
-        group.add(PathfollowingPlugin);
-        group.add(AiPlugin);
-        group.add(DespawnPlugin);
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(PhysicsSetup)
+            .add(DefaultResources)
+            .add(InputPlugin)
+            .add(SimpleFigurePlugin)
+            .add(CameraPlugin)
+            .add(BallPlugin)
+            .add(HealthPlugin)
+            .add(PathfindingPlugin)
+            .add(ShapePlugin)
+            .add(PathfollowingPlugin)
+            .add(AiPlugin)
+            .add(DespawnPlugin)
     }
 }
 
@@ -49,11 +62,11 @@ pub struct DefaultResources;
 
 impl Plugin for DefaultResources {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(Color::rgb(
+        app.insert_resource(ClearColor(Color::srgb(
             0xF9 as f32 / 255.0,
             0xF9 as f32 / 255.0,
             0xFF as f32 / 255.0,
         )))
-        .insert_resource(Msaa::default());
+        .insert_resource(Gravity(Vec2::ZERO));
     }
 }

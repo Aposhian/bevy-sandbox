@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 
 use crate::input::PlayerTag;
 use crate::pathfinding::GoalPosition;
@@ -9,30 +8,33 @@ pub struct AiPlugin;
 
 impl Plugin for AiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup).add_system(zombie_follow);
+        app.add_systems(Startup, setup)
+            .add_systems(Update, zombie_follow);
     }
 }
 
+#[derive(Resource)]
 struct ReplanTimer(Timer);
 
 fn setup(mut commands: Commands) {
-    commands.insert_resource(ReplanTimer(Timer::from_seconds(0.5, true)));
+    commands.insert_resource(ReplanTimer(Timer::from_seconds(0.5, TimerMode::Repeating)));
 }
 
 fn zombie_follow(
     mut commands: Commands,
     time: Res<Time>,
     mut timer: ResMut<ReplanTimer>,
-    player: Query<&RigidBodyPositionComponent, With<PlayerTag>>,
+    player: Query<&Transform, With<PlayerTag>>,
     zombies: Query<Entity, (Without<PlayerTag>, With<SimpleFigureTag>)>,
 ) {
     timer.0.tick(time.delta());
-    if timer.0.finished() {
-        if let Some(player_position) = player.iter().next() {
+    if timer.0.just_finished() {
+        if let Some(player_transform) = player.iter().next() {
+            let player_pos = player_transform.translation.truncate();
             for entity in zombies.iter() {
                 info!("Resetting zombie goal");
                 commands.entity(entity).insert(GoalPosition {
-                    position: player_position.position,
+                    position: player_pos,
                 });
             }
         }
