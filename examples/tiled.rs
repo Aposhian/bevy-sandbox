@@ -18,7 +18,7 @@ fn main() {
 }
 
 fn spawn_tilemap(mut tilemap_spawn_event: MessageWriter<TilemapSpawnEvent>) {
-    tilemap_spawn_event.write(TilemapSpawnEvent {
+    let _ = tilemap_spawn_event.write(TilemapSpawnEvent {
         path: Path::new("assets/example.tmx"),
-    })
+    });
 }

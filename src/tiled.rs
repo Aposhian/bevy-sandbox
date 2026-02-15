@@ -28,9 +28,9 @@ pub struct TilemapSpawnEvent {
 
 fn load_texture(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
     if let Some(image) = &tileset.image {
-        let path = std::fs::canonicalize(&image.source).unwrap();
+        let path = image.source.strip_prefix("assets/").unwrap_or(&image.source);
         info!("loading texture: {path:?}");
-        let texture_handle = asset_server.load(path);
+        let texture_handle = asset_server.load(path.to_path_buf());
         return Some(texture_handle);
     }
     None
