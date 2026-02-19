@@ -67,8 +67,8 @@ fn spawn(
             RigidBody::Dynamic,
             Collider::circle(0.1 * PIXELS_PER_METER),
             CollisionLayers::new(
-                LayerMask::from([GameLayer::Character, GameLayer::Ball]),
-                LayerMask::from([GameLayer::Character, GameLayer::Ball]),
+                LayerMask::from([GameLayer::Ball]),
+                LayerMask::from([GameLayer::Character, GameLayer::Ball, GameLayer::Wall]),
             ),
             CollisionEventsEnabled,
             Restitution::new(1.0),

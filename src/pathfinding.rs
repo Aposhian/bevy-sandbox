@@ -96,6 +96,13 @@ const MAX_TOI: f32 = 1.0;
 
 const INFLATION_LAYER: f32 = 0.2;
 
+/// Maximum distance (in grid units) that A* will explore from the start.
+/// Prevents unbounded search when the goal is unreachable.
+const MAX_SEARCH_RADIUS: i32 = 500;
+
+/// Accept arriving within this many grid units of the goal.
+const GOAL_TOLERANCE: i32 = 3;
+
 // Default character half-extents in meters
 const COLLIDER_HALF_W: f32 = 0.18;
 const COLLIDER_HALF_H: f32 = 0.40;
@@ -138,6 +145,11 @@ fn compute_path_to_goal(
         let result = astar(
             &start_grid,
             |position| {
+                // Don't expand nodes too far from start to bound the search
+                if position.distance(start_grid) > MAX_SEARCH_RADIUS {
+                    return Vec::new().into_iter();
+                }
+
                 (0..THETA_STEPS)
                     .map(|theta_step| {
                         let position = *position;
@@ -179,7 +191,7 @@ fn compute_path_to_goal(
                     .into_iter()
             },
             |position| position.distance(goal_grid),
-            |position| *position == goal_grid,
+            |position| position.distance(goal_grid) <= GOAL_TOLERANCE,
         );
 
         if let Some((path, _)) = result {

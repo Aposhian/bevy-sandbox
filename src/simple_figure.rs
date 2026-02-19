@@ -180,7 +180,7 @@ fn spawn(
                 0.80 * PIXELS_PER_METER,
             ),
             CollisionLayers::new(
-                LayerMask::from([GameLayer::Character, GameLayer::Wall]),
+                LayerMask::from([GameLayer::Character]),
                 LayerMask::from([GameLayer::Character, GameLayer::Wall]),
             ),
             CollisionEventsEnabled,
