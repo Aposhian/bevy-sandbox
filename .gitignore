@@ -11,3 +11,10 @@ Cargo.lock
 
 # Tiled editor
 *.tiled-session
+
+# AI settings
+CLAUDE.md
+GEMINI.md
+
+# Windows cross compile stuff
+*.exe
