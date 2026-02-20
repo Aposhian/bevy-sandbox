@@ -7,6 +7,8 @@ mod ai;
 mod ball;
 mod camera;
 mod ecs;
+#[cfg(feature = "fps_display")]
+mod fps;
 mod health;
 mod input;
 pub mod obstacle;
@@ -46,6 +48,9 @@ impl PluginGroup for SandboxPlugins {
 
         #[cfg(feature = "physics_debug")]
         let builder = builder.add(PhysicsDebugPlugin);
+
+        #[cfg(feature = "fps_display")]
+        let builder = builder.add(fps::FpsDisplayPlugin);
 
         builder
             .add(DefaultResources)

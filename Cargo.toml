@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 physics_debug = []
+fps_display = []
 
 [dependencies]
 bevy = "0.18"
