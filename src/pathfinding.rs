@@ -1,14 +1,18 @@
 use avian2d::prelude::*;
 use bevy::math::Mat2;
 use bevy::prelude::*;
-use bevy_prototype_lyon::prelude::*;
 use pathfinding::prelude::astar;
 use std::f32::consts::TAU;
 use std::ops::Add;
 use std::ops::Sub;
 
+#[cfg(feature = "path_debug")]
+use bevy_prototype_lyon::prelude::*;
+#[cfg(feature = "path_debug")]
 use crate::ecs::BondedEntities;
+#[cfg(feature = "path_debug")]
 use crate::ecs::DespawnEvent;
+
 use crate::input::PlayerTag;
 use crate::simple_figure::GameLayer;
 use crate::PIXELS_PER_METER;
@@ -17,7 +21,9 @@ pub struct PathfindingPlugin;
 
 impl Plugin for PathfindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (compute_path_to_goal, draw_paths));
+        app.add_systems(Update, compute_path_to_goal);
+        #[cfg(feature = "path_debug")]
+        app.add_systems(Update, draw_paths);
     }
 }
 
@@ -204,6 +210,7 @@ fn compute_path_to_goal(
     }
 }
 
+#[cfg(feature = "path_debug")]
 fn draw_paths(
     mut commands: Commands,
     mut path_query: Query<

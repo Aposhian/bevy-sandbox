@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
+#[cfg(feature = "path_debug")]
 use bevy_prototype_lyon::plugin::ShapePlugin;
 
 mod ai;
@@ -52,6 +53,9 @@ impl PluginGroup for SandboxPlugins {
         #[cfg(feature = "fps_display")]
         let builder = builder.add(fps::FpsDisplayPlugin);
 
+        #[cfg(feature = "path_debug")]
+        let builder = builder.add(ShapePlugin);
+
         builder
             .add(DefaultResources)
             .add(InputPlugin)
@@ -60,7 +64,6 @@ impl PluginGroup for SandboxPlugins {
             .add(BallPlugin)
             .add(HealthPlugin)
             .add(PathfindingPlugin)
-            .add(ShapePlugin)
             .add(PathfollowingPlugin)
             .add(AiPlugin)
             .add(DespawnPlugin)
