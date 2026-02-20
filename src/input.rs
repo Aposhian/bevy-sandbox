@@ -7,9 +7,22 @@ use bevy::window::PrimaryWindow;
 
 pub struct InputPlugin;
 
+/// Seconds between shots while the mouse button is held.
+const SHOOT_RATE: f32 = 0.15;
+
+#[derive(Resource)]
+struct ShootTimer(Timer);
+
+impl Default for ShootTimer {
+    fn default() -> Self {
+        ShootTimer(Timer::from_seconds(SHOOT_RATE, TimerMode::Repeating))
+    }
+}
+
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (keyboard, mouse_aim, movement));
+        app.init_resource::<ShootTimer>()
+            .add_systems(Update, (keyboard, mouse_aim, movement));
     }
 }
 
@@ -56,11 +69,30 @@ fn keyboard(
 
 fn mouse_aim(
     buttons: Res<ButtonInput<MouseButton>>,
+    time: Res<Time>,
+    mut shoot_timer: ResMut<ShootTimer>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     player_query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut ball_spawn_event: MessageWriter<BallSpawnEvent>,
 ) {
+    let just_pressed = buttons.just_pressed(MouseButton::Left);
+    let held = buttons.pressed(MouseButton::Left);
+
+    shoot_timer.0.tick(time.delta());
+
+    // On initial press, fire immediately and reset the timer so the first
+    // auto-fire interval starts from this click rather than whenever the
+    // timer last happened to finish.
+    if just_pressed {
+        shoot_timer.0.reset();
+    }
+
+    let should_fire = just_pressed || (held && shoot_timer.0.just_finished());
+    if !should_fire {
+        return;
+    }
+
     let Ok(window) = window_query.single() else {
         return;
     };
@@ -69,26 +101,21 @@ fn mouse_aim(
     };
 
     for player_tf in player_query.iter() {
-        if let Some(cursor_pos) = window.cursor_position() {
-            if buttons.just_pressed(MouseButton::Left) {
-                // Convert cursor screen position to world position
-                let Ok(cursor_world_pos) =
-                    camera.viewport_to_world_2d(camera_transform, cursor_pos)
-                else {
-                    continue;
-                };
+        let Some(cursor_pos) = window.cursor_position() else {
+            continue;
+        };
+        let Ok(cursor_world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos)
+        else {
+            continue;
+        };
 
-                let player_pos = player_tf.translation().xy();
-                let direction = (cursor_world_pos - player_pos).normalize_or_zero();
+        let player_pos = player_tf.translation().xy();
+        let direction = (cursor_world_pos - player_pos).normalize_or_zero();
 
-                info!("goal_position: {:?}", cursor_world_pos);
-
-                ball_spawn_event.write(BallSpawnEvent {
-                    position: player_pos + direction * PIXELS_PER_METER,
-                    velocity: direction * 10.0 * PIXELS_PER_METER,
-                });
-            }
-        }
+        ball_spawn_event.write(BallSpawnEvent {
+            position: player_pos + direction * PIXELS_PER_METER,
+            velocity: direction * 10.0 * PIXELS_PER_METER,
+        });
     }
 }
 
