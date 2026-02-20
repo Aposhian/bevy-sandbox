@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::path::Path;
 use std::sync::Arc;
@@ -201,6 +202,76 @@ fn process_object_layers(
 #[derive(Component, Default)]
 pub struct WallTag;
 
+/// A world-space axis-aligned rectangle, stored by center and half-extents.
+struct WorldRect {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+/// Merge a list of axis-aligned rectangles by joining touching neighbours.
+///
+/// Pass 1 — horizontal: group by (y, h), sort by x, join rects whose right
+/// edge meets the next rect's left edge.
+///
+/// Pass 2 — vertical: group by (x, w), sort by y, join rects whose top edge
+/// meets the next rect's bottom edge.
+fn merge_rects(mut rects: Vec<WorldRect>) -> Vec<WorldRect> {
+    // Quantise a float to an i64 key (0.001-pixel precision).
+    fn q(v: f32) -> i64 {
+        (v * 1000.0).round() as i64
+    }
+
+    // --- Pass 1: horizontal ---
+    rects.sort_unstable_by_key(|r| (q(r.y), q(r.h), q(r.x)));
+
+    let mut pass1: Vec<WorldRect> = Vec::with_capacity(rects.len());
+    let mut it = rects.into_iter();
+    if let Some(first) = it.next() {
+        let mut cur = first;
+        for next in it {
+            let same_row = q(cur.y) == q(next.y) && q(cur.h) == q(next.h);
+            let touching = (cur.x + cur.w / 2.0 - (next.x - next.w / 2.0)).abs() < 0.1;
+            if same_row && touching {
+                let lo = cur.x - cur.w / 2.0;
+                let hi = next.x + next.w / 2.0;
+                cur.w = hi - lo;
+                cur.x = (lo + hi) / 2.0;
+            } else {
+                pass1.push(cur);
+                cur = next;
+            }
+        }
+        pass1.push(cur);
+    }
+
+    // --- Pass 2: vertical ---
+    pass1.sort_unstable_by_key(|r| (q(r.x), q(r.w), q(r.y)));
+
+    let mut pass2: Vec<WorldRect> = Vec::with_capacity(pass1.len());
+    let mut it = pass1.into_iter();
+    if let Some(first) = it.next() {
+        let mut cur = first;
+        for next in it {
+            let same_col = q(cur.x) == q(next.x) && q(cur.w) == q(next.w);
+            let touching = (cur.y + cur.h / 2.0 - (next.y - next.h / 2.0)).abs() < 0.1;
+            if same_col && touching {
+                let lo = cur.y - cur.h / 2.0;
+                let hi = next.y + next.h / 2.0;
+                cur.h = hi - lo;
+                cur.y = (lo + hi) / 2.0;
+            } else {
+                pass2.push(cur);
+                cur = next;
+            }
+        }
+        pass2.push(cur);
+    }
+
+    pass2
+}
+
 fn add_colliders(
     mut commands: Commands,
     tile_query: Query<(&TilePos, &TileTextureIndex, &TilemapId)>,
@@ -212,77 +283,102 @@ fn add_colliders(
             continue;
         };
 
-        // Build a map of tile ID -> collision data
-        let mut collider_data: std::collections::HashMap<u32, Vec<_>> =
-            std::collections::HashMap::new();
+        // Build a map of tile ID -> collision objects.
+        let mut collider_data: HashMap<u32, Vec<_>> = HashMap::new();
         for (id, tile) in tileset.tiles() {
-            if let Some(object_layer_data) = &tile.collision {
-                collider_data.insert(id, object_layer_data.object_data().to_vec());
+            if let Some(col) = &tile.collision {
+                collider_data.insert(id, col.object_data().to_vec());
             }
         }
 
-        // Map grid size (used for tile positioning in bevy_ecs_tilemap)
         let grid_w = tiled_map.tile_width as f32;
         let grid_h = tiled_map.tile_height as f32;
-
-        // Tileset tile size (collision objects are in this coordinate space)
         let tileset_w = tileset.tile_width as f32;
         let tileset_h = tileset.tile_height as f32;
 
+        // Collect all world-space rects, split by whether they are axis-aligned.
+        let mut axis_aligned: Vec<WorldRect> = Vec::new();
+        // (rect, counter-clockwise rotation in radians)
+        let mut rotated: Vec<(WorldRect, f32)> = Vec::new();
+
         for (tile_pos, texture_index, tilemap_id) in tile_query.iter() {
-            if let Some(objects) = collider_data.get(&texture_index.0) {
-                // Get the tilemap layer's local transform for layer offsets
-                let tilemap_offset = tilemap_transform_query
-                    .get(tilemap_id.0)
-                    .map(|t| t.translation.truncate())
-                    .unwrap_or(Vec2::ZERO);
+            let Some(objects) = collider_data.get(&texture_index.0) else {
+                continue;
+            };
 
-                // bevy_ecs_tilemap (TilemapAnchor::None default) places the
-                // tile CENTER at (tile_pos * grid_size) in tilemap local space.
-                let tile_center_x = tile_pos.x as f32 * grid_w;
-                let tile_center_y = tile_pos.y as f32 * grid_h;
+            let tilemap_offset = tilemap_transform_query
+                .get(tilemap_id.0)
+                .map(|t| t.translation.truncate())
+                .unwrap_or(Vec2::ZERO);
 
-                for object in objects {
-                    let x_offset = object.x;
-                    let y_offset = object.y;
-                    match &object.shape {
-                        ObjectShape::Rect { width, height } => {
-                            // Collision object coords are relative to the
-                            // tileset tile's top-left corner (Tiled: y down).
-                            // Convert to offset from tile center (Bevy: y up).
-                            let rel_x = -tileset_w / 2.0 + x_offset + width / 2.0;
-                            let rel_y = tileset_h / 2.0 - y_offset - height / 2.0;
+            // bevy_ecs_tilemap places the tile CENTER at (pos * grid_size).
+            let tile_cx = tilemap_offset.x + tile_pos.x as f32 * grid_w;
+            let tile_cy = tilemap_offset.y + tile_pos.y as f32 * grid_h;
 
-                            let center_x = tilemap_offset.x + tile_center_x + rel_x;
-                            let center_y = tilemap_offset.y + tile_center_y + rel_y;
+            for object in objects {
+                let ObjectShape::Rect { width, height } = &object.shape else {
+                    warn!("Unsupported object shape: {:?}", object.shape);
+                    continue;
+                };
 
-                            let clockwise_rotation = object.rotation.to_radians();
-                            let counterclockwise_rotation = TAU - clockwise_rotation;
+                // Collision object coords are relative to the tile's top-left
+                // corner (Tiled: y down). Convert to offset from tile center
+                // (Bevy: y up).
+                let rel_x = -tileset_w / 2.0 + object.x + width / 2.0;
+                let rel_y = tileset_h / 2.0 - object.y - height / 2.0;
 
-                            commands.spawn((
-                                WallTag,
-                                RigidBody::Static,
-                                Collider::rectangle(*width, *height),
-                                CollisionLayers::new(
-                                    LayerMask::from([GameLayer::Wall]),
-                                    LayerMask::from([
-                                        GameLayer::Character,
-                                        GameLayer::Ball,
-                                        GameLayer::Wall,
-                                    ]),
-                                ),
-                                Transform::from_translation(Vec3::new(center_x, center_y, 0.0))
-                                    .with_rotation(Quat::from_rotation_z(
-                                        counterclockwise_rotation,
-                                    )),
-                            ));
-                        }
-                        _ => {
-                            warn!("Unsupported object shape: {:?}", object.shape);
-                        }
-                    }
+                let rect = WorldRect {
+                    x: tile_cx + rel_x,
+                    y: tile_cy + rel_y,
+                    w: *width,
+                    h: *height,
+                };
+
+                let cw_rot = object.rotation.to_radians();
+                if cw_rot.abs() < 1e-4 {
+                    axis_aligned.push(rect);
+                } else {
+                    rotated.push((rect, TAU - cw_rot));
                 }
             }
+        }
+
+        let raw = axis_aligned.len() + rotated.len();
+        let merged = merge_rects(axis_aligned);
+        info!(
+            "Wall colliders: {} raw → {} after merge ({} axis-aligned → {})",
+            raw,
+            merged.len() + rotated.len(),
+            raw - rotated.len(),
+            merged.len(),
+        );
+
+        let layers = || {
+            CollisionLayers::new(
+                LayerMask::from([GameLayer::Wall]),
+                LayerMask::from([GameLayer::Character, GameLayer::Ball, GameLayer::Wall]),
+            )
+        };
+
+        for rect in merged {
+            commands.spawn((
+                WallTag,
+                RigidBody::Static,
+                Collider::rectangle(rect.w, rect.h),
+                layers(),
+                Transform::from_translation(Vec3::new(rect.x, rect.y, 0.0)),
+            ));
+        }
+
+        for (rect, ccw_rot) in rotated {
+            commands.spawn((
+                WallTag,
+                RigidBody::Static,
+                Collider::rectangle(rect.w, rect.h),
+                layers(),
+                Transform::from_translation(Vec3::new(rect.x, rect.y, 0.0))
+                    .with_rotation(Quat::from_rotation_z(ccw_rot)),
+            ));
         }
     }
 }
