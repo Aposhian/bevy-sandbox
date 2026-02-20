@@ -183,7 +183,7 @@ fn spawn(
             AnimationTimer(Timer::new(Duration::from_millis(100), TimerMode::Repeating)),
             // Physics
             RigidBody::Dynamic,
-            Collider::rectangle(0.36 * PIXELS_PER_METER, 0.80 * PIXELS_PER_METER),
+            Collider::capsule(0.18 * PIXELS_PER_METER, 0.6 * PIXELS_PER_METER),
             CollisionLayers::new(
                 LayerMask::from([GameLayer::Character]),
                 LayerMask::from([GameLayer::Character, GameLayer::Wall, GameLayer::Ball]),
