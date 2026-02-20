@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_4;
 
 use crate::camera::CameraTarget;
-use crate::health::Health;
+use crate::health::{DamageKind, Health};
 use crate::input::{MoveAction, PlayerTag};
 use crate::PIXELS_PER_METER;
 
@@ -195,7 +195,7 @@ fn spawn(
         if spawn_event.playable {
             entity_commands.insert((PlayerTag, CameraTarget));
         } else {
-            entity_commands.insert(Health::from_max(5));
+            entity_commands.insert(Health::new(5, DamageKind::Projectile.mask()));
         }
     }
 }

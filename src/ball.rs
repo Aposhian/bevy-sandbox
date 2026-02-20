@@ -1,8 +1,7 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
 
-use crate::health::CollisionDamage;
-use crate::health::Health;
+use crate::health::{CollisionDamage, CollisionSelfDamage, DamageKind, Health};
 use crate::simple_figure::GameLayer;
 use crate::PIXELS_PER_METER;
 
@@ -55,8 +54,9 @@ fn spawn(
     for spawn_event in spawn_events.read() {
         commands.spawn((
             BallTag,
-            CollisionDamage { damage: 1 },
-            Health::from_max(3),
+            CollisionDamage { damage: 1, kind: DamageKind::Projectile },
+            CollisionSelfDamage { damage: 1, kind: DamageKind::Impact },
+            Health::new(3, DamageKind::Impact.mask()),
             Sprite::from_image(texture_handle.0.clone()),
             Transform::from_translation(Vec3::new(
                 spawn_event.position.x,

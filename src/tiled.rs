@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use tiled::{Loader, ObjectShape, Tileset};
 
-use crate::health::CollisionDamage;
 use crate::simple_figure::{GameLayer, SimpleFigureSpawnEvent};
 
 pub struct TiledPlugin;
@@ -264,8 +263,6 @@ fn add_colliders(
                                 WallTag,
                                 RigidBody::Static,
                                 Collider::rectangle(*width, *height),
-                                // TODO: Probably filter this for balls only later
-                                CollisionDamage { damage: 1 },
                                 CollisionLayers::new(
                                     LayerMask::from([GameLayer::Wall]),
                                     LayerMask::from([
