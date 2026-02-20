@@ -51,7 +51,9 @@ impl FromWorld for SimpleFigureTextureAtlasHandle {
             None,
             None,
         );
-        let mut layouts = world.get_resource_mut::<Assets<TextureAtlasLayout>>().unwrap();
+        let mut layouts = world
+            .get_resource_mut::<Assets<TextureAtlasLayout>>()
+            .unwrap();
         let layout_handle = layouts.add(layout);
         SimpleFigureTextureAtlasHandle {
             texture,
@@ -86,8 +88,14 @@ const ANIMATIONS: AnimationSet = AnimationSet {
     front_walk: AnimationIndices { first: 3, last: 5 },
     profile_stationary: AnimationIndices { first: 6, last: 8 },
     profile_walk: AnimationIndices { first: 9, last: 11 },
-    back_stationary: AnimationIndices { first: 12, last: 14 },
-    back_walk: AnimationIndices { first: 15, last: 17 },
+    back_stationary: AnimationIndices {
+        first: 12,
+        last: 14,
+    },
+    back_walk: AnimationIndices {
+        first: 15,
+        last: 17,
+    },
 };
 
 impl AnimationSet {
@@ -175,13 +183,10 @@ fn spawn(
             AnimationTimer(Timer::new(Duration::from_millis(100), TimerMode::Repeating)),
             // Physics
             RigidBody::Dynamic,
-            Collider::rectangle(
-                0.36 * PIXELS_PER_METER,
-                0.80 * PIXELS_PER_METER,
-            ),
+            Collider::rectangle(0.36 * PIXELS_PER_METER, 0.80 * PIXELS_PER_METER),
             CollisionLayers::new(
                 LayerMask::from([GameLayer::Character]),
-                LayerMask::from([GameLayer::Character, GameLayer::Wall]),
+                LayerMask::from([GameLayer::Character, GameLayer::Wall, GameLayer::Ball]),
             ),
             CollisionEventsEnabled,
             LockedAxes::ROTATION_LOCKED,

@@ -4,6 +4,9 @@ version = "0.3.0"
 authors = ["Adam Aposhian <aposhian.dev@gmail.com>"]
 edition = "2021"
 
+[features]
+physics_debug = []
+
 [dependencies]
 bevy = "0.18"
 avian2d = "0.5"

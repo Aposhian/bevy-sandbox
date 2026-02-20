@@ -8,31 +8,29 @@
  </tile>
  <tile id="1">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="0" y="16"/>
-   <object id="3" template="corner.tx" x="0" y="0"/>
-   <object id="4" template="corner.tx" x="16" y="0"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="32"/>
+   <object id="2" type="wall" x="16" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="2">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="edge.tx" x="0" y="16" rotation="270"/>
+   <object id="1" type="wall" x="0" y="0" width="32" height="16"/>
   </objectgroup>
  </tile>
  <tile id="3">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="corner.tx" x="0" y="0"/>
-   <object id="2" template="corner.tx" x="16" y="0"/>
-   <object id="3" template="corner.tx" x="16" y="16"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="16"/>
+   <object id="2" type="wall" x="16" y="0" width="16" height="32"/>
   </objectgroup>
  </tile>
  <tile id="4">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="16" y="16"/>
+   <object id="1" type="wall" x="16" y="16" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="5">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="0" y="16"/>
+   <object id="1" type="wall" x="0" y="16" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="6">
@@ -43,47 +41,45 @@
  </tile>
  <tile id="7">
   <objectgroup draworder="index" id="2">
-   <object id="1" template="edge.tx" x="0" y="0"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="32"/>
   </objectgroup>
  </tile>
  <tile id="9">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="edge.tx" x="16" y="0"/>
+   <object id="1" type="wall" x="16" y="0" width="16" height="32"/>
   </objectgroup>
  </tile>
  <tile id="10">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="16" y="0"/>
+   <object id="1" type="wall" x="16" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="11">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="0" y="0"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="12">
   <objectgroup draworder="index" id="2">
-   <object id="2" type="wall" x="0" y="0" width="16" height="16"/>
-   <object id="3" type="wall" x="16" y="16" width="16" height="16"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="16"/>
+   <object id="2" type="wall" x="16" y="16" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="13">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="0" y="0"/>
-   <object id="3" template="corner.tx" x="0" y="16"/>
-   <object id="4" template="corner.tx" x="16" y="16"/>
+   <object id="1" type="wall" x="0" y="0" width="16" height="32"/>
+   <object id="2" type="wall" x="16" y="16" width="16" height="16"/>
   </objectgroup>
  </tile>
  <tile id="14">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="edge.tx" x="32" y="16" rotation="90"/>
+   <object id="1" type="wall" x="0" y="16" width="32" height="16"/>
   </objectgroup>
  </tile>
  <tile id="15">
   <objectgroup draworder="index" id="2">
-   <object id="2" template="corner.tx" x="16" y="0"/>
-   <object id="3" template="corner.tx" x="16" y="16"/>
-   <object id="4" template="corner.tx" x="0" y="16"/>
+   <object id="1" type="wall" x="0" y="16" width="16" height="16"/>
+   <object id="2" type="wall" x="16" y="0" width="16" height="32"/>
   </objectgroup>
  </tile>
  <wangsets>

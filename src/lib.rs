@@ -42,8 +42,12 @@ impl Plugin for PhysicsSetup {
 
 impl PluginGroup for SandboxPlugins {
     fn build(self) -> PluginGroupBuilder {
-        PluginGroupBuilder::start::<Self>()
-            .add(PhysicsSetup)
+        let builder = PluginGroupBuilder::start::<Self>().add(PhysicsSetup);
+
+        #[cfg(feature = "physics_debug")]
+        let builder = builder.add(PhysicsDebugPlugin);
+
+        builder
             .add(DefaultResources)
             .add(InputPlugin)
             .add(SimpleFigurePlugin)

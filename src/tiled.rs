@@ -206,7 +206,7 @@ pub struct WallTag;
 fn add_colliders(
     mut commands: Commands,
     tile_query: Query<(&TilePos, &TileTextureIndex, &TilemapId)>,
-    tilemap_transform_query: Query<&GlobalTransform>,
+    tilemap_transform_query: Query<&Transform, With<TilemapSize>>,
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
@@ -222,34 +222,40 @@ fn add_colliders(
             }
         }
 
+        // Map grid size (used for tile positioning in bevy_ecs_tilemap)
+        let grid_w = tiled_map.tile_width as f32;
+        let grid_h = tiled_map.tile_height as f32;
+
+        // Tileset tile size (collision objects are in this coordinate space)
+        let tileset_w = tileset.tile_width as f32;
+        let tileset_h = tileset.tile_height as f32;
+
         for (tile_pos, texture_index, tilemap_id) in tile_query.iter() {
             if let Some(objects) = collider_data.get(&texture_index.0) {
-                let physics_tile_height = tiled_map.tile_height as f32;
-
-                // Get the tilemap layer's transform to account for layer offsets
+                // Get the tilemap layer's local transform for layer offsets
                 let tilemap_offset = tilemap_transform_query
                     .get(tilemap_id.0)
-                    .map(|t| t.translation().truncate())
+                    .map(|t| t.translation.truncate())
                     .unwrap_or(Vec2::ZERO);
 
-                let tile_w = tiled_map.tile_width as f32;
-                let tile_h = tiled_map.tile_height as f32;
-
-                // bevy_ecs_tilemap centers tile (0,0) at the tilemap origin
-                // (TilemapAnchor::None default), so the tile's bottom-left
-                // corner is at (tile_pos * grid_size - grid_size/2).
-                let x = tile_pos.x as f32 * tile_w - tile_w / 2.0;
-                let y = tile_pos.y as f32 * tile_h - tile_h / 2.0;
+                // bevy_ecs_tilemap (TilemapAnchor::None default) places the
+                // tile CENTER at (tile_pos * grid_size) in tilemap local space.
+                let tile_center_x = tile_pos.x as f32 * grid_w;
+                let tile_center_y = tile_pos.y as f32 * grid_h;
 
                 for object in objects {
                     let x_offset = object.x;
                     let y_offset = object.y;
                     match &object.shape {
                         ObjectShape::Rect { width, height } => {
-                            // In Tiled, position is top-left corner; in Bevy, position is center.
-                            // In Tiled, y increases down; in Bevy, y increases up.
-                            let center_x = tilemap_offset.x + x + x_offset + width / 2.0;
-                            let center_y = tilemap_offset.y + y + physics_tile_height - y_offset - height / 2.0;
+                            // Collision object coords are relative to the
+                            // tileset tile's top-left corner (Tiled: y down).
+                            // Convert to offset from tile center (Bevy: y up).
+                            let rel_x = -tileset_w / 2.0 + x_offset + width / 2.0;
+                            let rel_y = tileset_h / 2.0 - y_offset - height / 2.0;
+
+                            let center_x = tilemap_offset.x + tile_center_x + rel_x;
+                            let center_y = tilemap_offset.y + tile_center_y + rel_y;
 
                             let clockwise_rotation = object.rotation.to_radians();
                             let counterclockwise_rotation = TAU - clockwise_rotation;
