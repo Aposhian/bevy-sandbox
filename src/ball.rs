@@ -56,7 +56,7 @@ fn spawn(
         commands.spawn((
             BallTag,
             CollisionDamage { damage: 1 },
-            Health::from_max(1),
+            Health::from_max(3),
             Sprite::from_image(texture_handle.0.clone()),
             Transform::from_translation(Vec3::new(
                 spawn_event.position.x,

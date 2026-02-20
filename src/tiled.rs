@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use tiled::{Loader, ObjectShape, Tileset};
 
+use crate::health::CollisionDamage;
 use crate::simple_figure::{GameLayer, SimpleFigureSpawnEvent};
 
 pub struct TiledPlugin;
@@ -28,7 +29,10 @@ pub struct TilemapSpawnEvent {
 
 fn load_texture(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
     if let Some(image) = &tileset.image {
-        let path = image.source.strip_prefix("assets/").unwrap_or(&image.source);
+        let path = image
+            .source
+            .strip_prefix("assets/")
+            .unwrap_or(&image.source);
         info!("loading texture: {path:?}");
         let texture_handle = asset_server.load(path.to_path_buf());
         return Some(texture_handle);
@@ -111,11 +115,7 @@ fn process_layer(
         storage: tile_storage,
         texture: TilemapTexture::Single(texture_handle.clone()),
         tile_size,
-        transform: Transform::from_xyz(
-            layer.offset_x,
-            -layer.offset_y,
-            layer_index as f32,
-        ),
+        transform: Transform::from_xyz(layer.offset_x, -layer.offset_y, layer_index as f32),
         ..Default::default()
     });
 
@@ -150,12 +150,10 @@ fn spawn(
             );
         }
 
-        commands
-            .entity(tilemap_entity)
-            .insert((
-                TiledMapComponent(tiled_map),
-                Transform::from_xyz(0.0, 0.0, 0.0),
-            ));
+        commands.entity(tilemap_entity).insert((
+            TiledMapComponent(tiled_map),
+            Transform::from_xyz(0.0, 0.0, 0.0),
+        ));
     }
 }
 
@@ -164,12 +162,13 @@ fn process_object_layers(
     mut spawn_event: MessageWriter<SimpleFigureSpawnEvent>,
 ) {
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
-        if let Some(object_layer) = tiled_map.layers().find_map(|layer| {
-            match layer.layer_type() {
+        if let Some(object_layer) = tiled_map
+            .layers()
+            .find_map(|layer| match layer.layer_type() {
                 tiled::LayerType::Objects(object_layer) => Some(object_layer),
                 _ => None,
-            }
-        }) {
+            })
+        {
             info!("Found object layer");
             for object in object_layer.objects() {
                 if object.user_type.as_str() == "simple_figure" {
@@ -215,7 +214,8 @@ fn add_colliders(
         };
 
         // Build a map of tile ID -> collision data
-        let mut collider_data: std::collections::HashMap<u32, Vec<_>> = std::collections::HashMap::new();
+        let mut collider_data: std::collections::HashMap<u32, Vec<_>> =
+            std::collections::HashMap::new();
         for (id, tile) in tileset.tiles() {
             if let Some(object_layer_data) = &tile.collision {
                 collider_data.insert(id, object_layer_data.object_data().to_vec());
@@ -264,6 +264,8 @@ fn add_colliders(
                                 WallTag,
                                 RigidBody::Static,
                                 Collider::rectangle(*width, *height),
+                                // TODO: Probably filter this for balls only later
+                                CollisionDamage { damage: 1 },
                                 CollisionLayers::new(
                                     LayerMask::from([GameLayer::Wall]),
                                     LayerMask::from([
