@@ -208,7 +208,7 @@ fn execute_save(
             camera_position,
         };
 
-        let filename = format!("save_{}.bin", req.slot);
+        let filename = format!("save_{}.binpb", req.slot);
         let filepath = save_dir.0.join(&filename);
         let encoded = save_game.encode_to_vec();
         if let Err(e) = fs::write(&filepath, &encoded) {
