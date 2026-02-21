@@ -2,16 +2,36 @@ use std::collections::VecDeque;
 
 use bevy::prelude::*;
 
-pub struct FpsDisplayPlugin;
+use crate::net::sync::TickSyncState;
+use crate::net::{HostTick, NetworkRole};
+
+pub struct DebugDisplayPlugin;
 
 /// Length of the rolling window used for avg/min/max stats.
 const WINDOW_SECS: f32 = 10.0;
 
-impl Plugin for FpsDisplayPlugin {
+impl Plugin for DebugDisplayPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FpsBuffer>()
+            .init_resource::<DebugDisplayVisible>()
             .add_systems(Startup, setup)
-            .add_systems(Update, (update_buffer, update_text).chain());
+            .add_systems(
+                Update,
+                (update_buffer, update_text, toggle_visibility).chain(),
+            );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Visibility toggle
+// ---------------------------------------------------------------------------
+
+#[derive(Resource)]
+struct DebugDisplayVisible(bool);
+
+impl Default for DebugDisplayVisible {
+    fn default() -> Self {
+        DebugDisplayVisible(true)
     }
 }
 
@@ -93,11 +113,11 @@ impl FpsBuffer {
 // ---------------------------------------------------------------------------
 
 #[derive(Component)]
-struct FpsText;
+struct DebugDisplayText;
 
 fn setup(mut commands: Commands) {
     commands.spawn((
-        FpsText,
+        DebugDisplayText,
         Text::new(""),
         TextFont {
             font_size: 13.0,
@@ -119,6 +139,23 @@ fn setup(mut commands: Commands) {
 // Systems
 // ---------------------------------------------------------------------------
 
+fn toggle_visibility(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut visible: ResMut<DebugDisplayVisible>,
+    mut query: Query<&mut Node, With<DebugDisplayText>>,
+) {
+    if keyboard.just_pressed(KeyCode::F2) {
+        visible.0 = !visible.0;
+    }
+    for mut node in query.iter_mut() {
+        node.display = if visible.0 {
+            Display::DEFAULT
+        } else {
+            Display::None
+        };
+    }
+}
+
 fn update_buffer(time: Res<Time>, mut buffer: ResMut<FpsBuffer>) {
     let delta = time.delta_secs();
     if delta > 0.0 {
@@ -126,12 +163,19 @@ fn update_buffer(time: Res<Time>, mut buffer: ResMut<FpsBuffer>) {
     }
 }
 
-fn update_text(buffer: Res<FpsBuffer>, mut query: Query<&mut Text, With<FpsText>>) {
+fn update_text(
+    buffer: Res<FpsBuffer>,
+    role: Res<NetworkRole>,
+    host_tick: Res<HostTick>,
+    sync_state: Res<TickSyncState>,
+    mut query: Query<&mut Text, With<DebugDisplayText>>,
+) {
     let Some(mut text) = query.iter_mut().next() else {
         return;
     };
+
     let elapsed = buffer.total_secs.min(WINDOW_SECS);
-    text.0 = format!(
+    let mut lines = format!(
         "cur {:.0}  avg {:.0}  min {:.0}  max {:.0} fps  ({:.0}s)",
         buffer.current(),
         buffer.avg(),
@@ -139,4 +183,33 @@ fn update_text(buffer: Res<FpsBuffer>, mut query: Query<&mut Text, With<FpsText>
         buffer.max(),
         elapsed,
     );
+
+    // Network info
+    match &*role {
+        NetworkRole::Offline => {
+            lines.push_str("\noffline");
+        }
+        NetworkRole::Host { port } => {
+            lines.push_str(&format!("\nhost :{port}  tick {}", host_tick.0));
+        }
+        NetworkRole::Guest { addr } => {
+            lines.push_str(&format!("\nguest -> {addr}"));
+            lines.push_str(&format!("\nhost tick {}", sync_state.last_host_tick));
+            lines.push_str(&format!("  local tick {}", sync_state.local_tick));
+
+            if !sync_state.drift_samples.is_empty() {
+                let samples = &sync_state.drift_samples;
+                let n = samples.len() as f64;
+                let avg = samples.iter().sum::<i64>() as f64 / n;
+                let min = samples.iter().copied().min().unwrap_or(0);
+                let max = samples.iter().copied().max().unwrap_or(0);
+                lines.push_str(&format!(
+                    "\nslew {:.2}x  drift avg {avg:.1} min {min} max {max}",
+                    sync_state.current_speed,
+                ));
+            }
+        }
+    }
+
+    text.0 = lines;
 }

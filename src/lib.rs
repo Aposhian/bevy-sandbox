@@ -8,8 +8,8 @@ mod ai;
 mod ball;
 mod camera;
 mod ecs;
-#[cfg(feature = "fps_display")]
-mod fps;
+#[cfg(feature = "debug_display")]
+mod debug_display;
 pub mod game_state;
 mod health;
 mod input;
@@ -58,8 +58,8 @@ impl PluginGroup for SandboxPlugins {
         #[cfg(feature = "physics_debug")]
         let builder = builder.add(PhysicsDebugPlugin);
 
-        #[cfg(feature = "fps_display")]
-        let builder = builder.add(fps::FpsDisplayPlugin);
+        #[cfg(feature = "debug_display")]
+        let builder = builder.add(debug_display::DebugDisplayPlugin);
 
         #[cfg(feature = "path_debug")]
         let builder = builder.add(ShapePlugin);

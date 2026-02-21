@@ -62,6 +62,21 @@ impl SaveTrigger {
     }
 }
 
+/// Minimum duration to display the "Saving" indicator so it is visible.
+const SAVING_DISPLAY_SECS: f32 = 1.5;
+
+#[derive(Resource)]
+struct SavingIndicatorTimer(Timer);
+
+impl Default for SavingIndicatorTimer {
+    fn default() -> Self {
+        SavingIndicatorTimer(Timer::from_seconds(0.0, TimerMode::Once))
+    }
+}
+
+#[derive(Component)]
+struct SavingIndicatorText;
+
 pub struct SavePlugin;
 
 impl Plugin for SavePlugin {
@@ -72,9 +87,50 @@ impl Plugin for SavePlugin {
         )))
         .insert_resource(SaveDir(save_directory()))
         .insert_resource(CurrentMapPath("assets/example.tmx".to_string()))
+        .init_resource::<SavingIndicatorTimer>()
         .add_message::<SaveGameRequest>()
         .add_message::<LoadGameRequest>()
-        .add_systems(Update, (execute_save, execute_load, auto_save_tick));
+        .add_systems(Startup, setup_saving_indicator)
+        .add_systems(
+            Update,
+            (execute_save, execute_load, auto_save_tick, update_saving_indicator),
+        );
+    }
+}
+
+fn setup_saving_indicator(mut commands: Commands) {
+    commands.spawn((
+        SavingIndicatorText,
+        Text::new("Saving..."),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            right: Val::Px(12.0),
+            padding: UiRect::all(Val::Px(6.0)),
+            display: Display::None,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+    ));
+}
+
+fn update_saving_indicator(
+    time: Res<Time>,
+    mut timer: ResMut<SavingIndicatorTimer>,
+    mut query: Query<&mut Node, With<SavingIndicatorText>>,
+) {
+    timer.0.tick(time.delta());
+    for mut node in query.iter_mut() {
+        node.display = if timer.0.elapsed_secs() < timer.0.duration().as_secs_f32() {
+            Display::DEFAULT
+        } else {
+            Display::None
+        };
     }
 }
 
@@ -237,6 +293,7 @@ impl SaveIndex {
 
 fn execute_save(
     mut requests: MessageReader<SaveGameRequest>,
+    mut saving_timer: ResMut<SavingIndicatorTimer>,
     save_dir: Res<SaveDir>,
     map_path: Res<CurrentMapPath>,
     player_query: Query<(&Transform, &LinearVelocity), (With<PlayerTag>, With<SimpleFigureTag>)>,
@@ -339,6 +396,8 @@ fn execute_save(
             &save_dir.0,
         );
         index.gc(&save_dir.0);
+
+        saving_timer.0 = Timer::from_seconds(SAVING_DISPLAY_SECS, TimerMode::Once);
 
         info!(
             "Game saved: {} ({})",

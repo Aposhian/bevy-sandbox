@@ -12,8 +12,7 @@ impl Plugin for HealthPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (damage, health_despawner, tick_damage_cooldown)
-                .run_if(in_state(GameState::Playing)),
+            (damage, health_despawner, tick_damage_cooldown).run_if(in_state(GameState::Playing)),
         );
     }
 }
@@ -41,7 +40,6 @@ pub struct DamageKindMask(pub u32);
 
 impl DamageKindMask {
     pub const NONE: Self = DamageKindMask(0);
-    pub const ALL: Self = DamageKindMask(u32::MAX);
 
     pub fn contains(self, kind: DamageKind) -> bool {
         self.0 & (1 << kind as u32) != 0
