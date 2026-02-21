@@ -7,10 +7,11 @@ message Vec2 {
 }
 
 enum EntityKind {
-  ENTITY_KIND_PLAYER = 0;
-  ENTITY_KIND_NPC = 1;
-  ENTITY_KIND_BALL = 2;
-  ENTITY_KIND_GUEST = 3;
+  ENTITY_KIND_UNSPECIFIED = 0;
+  ENTITY_KIND_PLAYER = 1;
+  ENTITY_KIND_NPC = 2;
+  ENTITY_KIND_BALL = 3;
+  ENTITY_KIND_GUEST = 4;
 }
 
 message EntityState {
