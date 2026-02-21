@@ -268,7 +268,6 @@ fn guest_apply_pending_snapshot(
                         ]),
                     ),
                     LockedAxes::ROTATION_LOCKED,
-                    MoveAction::default(),
                     LinearVelocity(vel),
                 ));
 
@@ -422,9 +421,12 @@ fn guest_apply_updates(
         return;
     };
 
-    // Process all pending updates (use latest for positioning)
+    // Drain all pending updates; accumulate despawns from every update
+    // but use only the latest for entity positions.
+    let mut all_despawned: Vec<u64> = Vec::new();
     let mut latest_update: Option<proto::WorldUpdate> = None;
     while let Ok(update) = channels.update_rx.try_recv() {
+        all_despawned.extend_from_slice(&update.despawned);
         latest_update = Some(update);
     }
 
@@ -435,10 +437,12 @@ fn guest_apply_updates(
         sync.last_host_tick = update.host_tick;
     }
 
-    // Handle despawned entities
-    for despawned_id in &update.despawned {
+    // Handle despawned entities (from ALL drained updates, not just the latest)
+    for despawned_id in &all_despawned {
         if let Some(local_entity) = entity_map.0.remove(despawned_id) {
-            commands.entity(local_entity).despawn();
+            if let Ok(mut entity_commands) = commands.get_entity(local_entity) {
+                entity_commands.despawn();
+            }
         }
     }
 
