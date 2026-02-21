@@ -25,11 +25,15 @@ impl Plugin for TiledPlugin {
 }
 
 #[derive(Component)]
-pub struct TiledMapComponent(tiled::Map);
+pub struct TiledMapComponent {
+    pub map: tiled::Map,
+    pub objects_enabled: bool,
+}
 
 #[derive(Message)]
 pub struct TilemapSpawnEvent {
     pub path: String,
+    pub objects_enabled: bool,
 }
 
 fn load_texture(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
@@ -156,7 +160,10 @@ fn spawn(
         }
 
         commands.entity(tilemap_entity).insert((
-            TiledMapComponent(tiled_map),
+            TiledMapComponent {
+                map: tiled_map,
+                objects_enabled: spawn_event.objects_enabled,
+            },
             Transform::from_xyz(0.0, 0.0, 0.0),
         ));
     }
@@ -170,7 +177,14 @@ fn process_object_layers(
     if suppress.is_some() {
         return;
     }
-    for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
+    for TiledMapComponent {
+        map: tiled_map,
+        objects_enabled,
+    } in tiled_map_query.iter()
+    {
+        if !objects_enabled {
+            continue;
+        }
         if let Some(object_layer) = tiled_map
             .layers()
             .find_map(|layer| match layer.layer_type() {
@@ -287,7 +301,7 @@ fn add_colliders(
     tilemap_transform_query: Query<&Transform, With<TilemapSize>>,
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
 ) {
-    for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
+    for TiledMapComponent { map: tiled_map, .. } in tiled_map_query.iter() {
         let Some(tileset) = tiled_map.tilesets().first() else {
             continue;
         };

@@ -18,5 +18,6 @@ fn main() {
 fn spawn_tilemap(mut tilemap_spawn_event: MessageWriter<TilemapSpawnEvent>) {
     let _ = tilemap_spawn_event.write(TilemapSpawnEvent {
         path: "assets/example.tmx".to_string(),
+        objects_enabled: true,
     });
 }

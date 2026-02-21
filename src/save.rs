@@ -37,10 +37,7 @@ impl Plugin for SavePlugin {
         .insert_resource(CurrentMapPath("assets/example.tmx".to_string()))
         .add_message::<SaveGameRequest>()
         .add_message::<LoadGameRequest>()
-        .add_systems(
-            Update,
-            (execute_save, execute_load, auto_save_tick),
-        );
+        .add_systems(Update, (execute_save, execute_load, auto_save_tick));
     }
 }
 
@@ -130,10 +127,7 @@ fn execute_save(
     mut requests: MessageReader<SaveGameRequest>,
     save_dir: Res<SaveDir>,
     map_path: Res<CurrentMapPath>,
-    player_query: Query<
-        (&Transform, &LinearVelocity),
-        (With<PlayerTag>, With<SimpleFigureTag>),
-    >,
+    player_query: Query<(&Transform, &LinearVelocity), (With<PlayerTag>, With<SimpleFigureTag>)>,
     npc_query: Query<
         (&Transform, &LinearVelocity, &Health),
         (With<SimpleFigureTag>, Without<PlayerTag>),
@@ -158,18 +152,16 @@ fn execute_save(
             .unwrap()
             .as_secs();
 
-        let player = player_query.iter().next().map(|(tf, vel)| {
-            proto::PlayerState {
+        let player = player_query
+            .iter()
+            .next()
+            .map(|(tf, vel)| proto::PlayerState {
                 position: Some(proto::Vec2 {
                     x: tf.translation.x,
                     y: tf.translation.y,
                 }),
-                velocity: Some(proto::Vec2 {
-                    x: vel.x,
-                    y: vel.y,
-                }),
-            }
-        });
+                velocity: Some(proto::Vec2 { x: vel.x, y: vel.y }),
+            });
 
         let npcs: Vec<proto::NpcState> = npc_query
             .iter()
@@ -178,10 +170,7 @@ fn execute_save(
                     x: tf.translation.x,
                     y: tf.translation.y,
                 }),
-                velocity: Some(proto::Vec2 {
-                    x: vel.x,
-                    y: vel.y,
-                }),
+                velocity: Some(proto::Vec2 { x: vel.x, y: vel.y }),
                 health_max: health.max,
                 health_current: health.current,
                 vulnerable_to_mask: health.vulnerable_to.0,
@@ -196,10 +185,7 @@ fn execute_save(
                     x: tf.translation.x,
                     y: tf.translation.y,
                 }),
-                velocity: Some(proto::Vec2 {
-                    x: vel.x,
-                    y: vel.y,
-                }),
+                velocity: Some(proto::Vec2 { x: vel.x, y: vel.y }),
                 health_max: health.max,
                 health_current: health.current,
                 vulnerable_to_mask: health.vulnerable_to.0,
@@ -302,12 +288,21 @@ fn execute_load(
         map_path.0 = save_game.map_path.clone();
         tilemap_spawn.write(TilemapSpawnEvent {
             path: save_game.map_path.clone(),
+            objects_enabled: false,
         });
 
         // Spawn player
         if let Some(ps) = &save_game.player {
-            let pos = ps.position.as_ref().map(|p| Vec2::new(p.x, p.y)).unwrap_or_default();
-            let vel = ps.velocity.as_ref().map(|v| Vec2::new(v.x, v.y)).unwrap_or_default();
+            let pos = ps
+                .position
+                .as_ref()
+                .map(|p| Vec2::new(p.x, p.y))
+                .unwrap_or_default();
+            let vel = ps
+                .velocity
+                .as_ref()
+                .map(|v| Vec2::new(v.x, v.y))
+                .unwrap_or_default();
 
             commands.spawn((
                 SimpleFigureTag,
@@ -338,8 +333,16 @@ fn execute_load(
 
         // Spawn NPCs
         for npc in &save_game.npcs {
-            let pos = npc.position.as_ref().map(|p| Vec2::new(p.x, p.y)).unwrap_or_default();
-            let vel = npc.velocity.as_ref().map(|v| Vec2::new(v.x, v.y)).unwrap_or_default();
+            let pos = npc
+                .position
+                .as_ref()
+                .map(|p| Vec2::new(p.x, p.y))
+                .unwrap_or_default();
+            let vel = npc
+                .velocity
+                .as_ref()
+                .map(|v| Vec2::new(v.x, v.y))
+                .unwrap_or_default();
 
             commands.spawn((
                 SimpleFigureTag,
@@ -373,8 +376,16 @@ fn execute_load(
 
         // Spawn balls
         for ball in &save_game.balls {
-            let pos = ball.position.as_ref().map(|p| Vec2::new(p.x, p.y)).unwrap_or_default();
-            let vel = ball.velocity.as_ref().map(|v| Vec2::new(v.x, v.y)).unwrap_or_default();
+            let pos = ball
+                .position
+                .as_ref()
+                .map(|p| Vec2::new(p.x, p.y))
+                .unwrap_or_default();
+            let vel = ball
+                .velocity
+                .as_ref()
+                .map(|v| Vec2::new(v.x, v.y))
+                .unwrap_or_default();
 
             commands.spawn((
                 BallTag,
