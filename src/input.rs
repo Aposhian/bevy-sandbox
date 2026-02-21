@@ -1,5 +1,6 @@
 use crate::ball::BallSpawnEvent;
 use crate::game_state::GameState;
+use crate::net::NetworkRole;
 use crate::PIXELS_PER_METER;
 use avian2d::prelude::*;
 use bevy::math::Vec3Swizzles;
@@ -25,7 +26,13 @@ impl Plugin for InputPlugin {
         app.init_resource::<ShootTimer>()
             .add_systems(
                 Update,
-                (keyboard, mouse_aim, movement).run_if(in_state(GameState::Playing)),
+                (keyboard, mouse_aim)
+                    .run_if(in_state(GameState::Playing))
+                    .run_if(not_guest),
+            )
+            .add_systems(
+                Update,
+                movement.run_if(in_state(GameState::Playing)),
             );
     }
 }
@@ -39,6 +46,10 @@ pub struct MoveAction {
 /// Tag that marks entity as playable
 #[derive(Component)]
 pub struct PlayerTag;
+
+fn not_guest(role: Res<NetworkRole>) -> bool {
+    !matches!(*role, NetworkRole::Guest { .. })
+}
 
 fn keyboard(
     keyboard_input: Res<ButtonInput<KeyCode>>,

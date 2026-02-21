@@ -12,11 +12,8 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(GameState::Paused), despawn_menu)
             .add_systems(
                 Update,
-                button_interactions.run_if(in_state(GameState::Paused)),
-            )
-            .add_systems(
-                Update,
-                menu_actions.run_if(in_state(GameState::Paused)),
+                (button_interactions, menu_actions, join_input_system)
+                    .run_if(in_state(GameState::Paused)),
             );
     }
 }
@@ -29,6 +26,9 @@ enum MenuAction {
     Resume,
     QuickSave,
     ShowLoad,
+    HostGame,
+    ShowJoin,
+    JoinGame,
     Exit,
     LoadFile(String),
     Back,
@@ -102,6 +102,8 @@ fn spawn_main_panel_under(commands: &mut Commands, parent: Entity) {
     spawn_button_under(commands, panel, "Resume", MenuAction::Resume);
     spawn_button_under(commands, panel, "Save Game", MenuAction::QuickSave);
     spawn_button_under(commands, panel, "Load Game", MenuAction::ShowLoad);
+    spawn_button_under(commands, panel, "Host Game", MenuAction::HostGame);
+    spawn_button_under(commands, panel, "Join Game", MenuAction::ShowJoin);
     spawn_button_under(commands, panel, "Exit Game", MenuAction::Exit);
 }
 
@@ -168,6 +170,90 @@ fn spawn_load_panel_under(commands: &mut Commands, parent: Entity, index: &SaveI
     spawn_button_under(commands, panel, "Back", MenuAction::Back);
 }
 
+/// Marker for the text input field in the join panel.
+#[derive(Component)]
+struct JoinAddrInput;
+
+fn spawn_join_panel_under(commands: &mut Commands, parent: Entity) {
+    let panel = commands
+        .spawn((
+            MenuPanel,
+            panel_node(),
+            BackgroundColor(Color::srgb(0.1, 0.1, 0.1)),
+        ))
+        .id();
+    commands.entity(parent).add_child(panel);
+
+    let title = commands
+        .spawn((
+            Text::new("Join Game"),
+            TextFont {
+                font_size: 28.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Node {
+                margin: UiRect::bottom(Val::Px(10.0)),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(panel).add_child(title);
+
+    let hint = commands
+        .spawn((
+            Text::new("Enter host address (e.g. 127.0.0.1:5555)"),
+            TextFont {
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(Color::srgb(0.7, 0.7, 0.7)),
+            Node {
+                margin: UiRect::bottom(Val::Px(5.0)),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(panel).add_child(hint);
+
+    // Text input field (editable via keyboard in join_input_system)
+    let input_bg = commands
+        .spawn((
+            Node {
+                width: Val::Px(250.0),
+                height: Val::Px(35.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(4.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+        ))
+        .id();
+    commands.entity(panel).add_child(input_bg);
+
+    let input_text = commands
+        .spawn((
+            JoinAddrInput,
+            Text::new("127.0.0.1:5555".to_string()),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ))
+        .id();
+    commands.entity(input_bg).add_child(input_text);
+
+    spawn_button_under(
+        commands,
+        panel,
+        "Connect",
+        MenuAction::JoinGame, // actual addr read from input at press time
+    );
+    spawn_button_under(commands, panel, "Back", MenuAction::Back);
+}
+
 fn format_timestamp(secs: u64) -> String {
     let hours = (secs / 3600) % 24;
     let minutes = (secs / 60) % 60;
@@ -229,6 +315,7 @@ fn menu_actions(
     save_dir: Res<SaveDir>,
     menu_root: Query<Entity, With<MenuRoot>>,
     panels: Query<Entity, With<MenuPanel>>,
+    join_input: Query<&Text, With<JoinAddrInput>>,
 ) {
     for (interaction, action) in interaction_query.iter() {
         if *interaction != Interaction::Pressed {
@@ -247,6 +334,30 @@ fn menu_actions(
             }
             MenuAction::ShowLoad => {
                 rebuild_with_load(&mut commands, &menu_root, &panels, &save_dir);
+            }
+            MenuAction::HostGame => {
+                commands.queue(|world: &mut World| {
+                    crate::net::host::start_hosting(world, 5555);
+                });
+                info!("Hosting game on port 5555");
+                next_state.set(GameState::Playing);
+            }
+            MenuAction::ShowJoin => {
+                rebuild_with_join(&mut commands, &menu_root, &panels);
+            }
+            MenuAction::JoinGame => {
+                // Read the actual address from the text input
+                let addr = join_input
+                    .iter()
+                    .next()
+                    .map(|t| t.0.clone())
+                    .unwrap_or_else(|| "127.0.0.1:5555".to_string());
+                let addr_clone = addr.clone();
+                commands.queue(move |world: &mut World| {
+                    crate::net::guest::start_guest_connection(world, addr_clone);
+                });
+                info!("Joining game at {addr}");
+                next_state.set(GameState::Playing);
             }
             MenuAction::Exit => {
                 exit.write(AppExit::Success);
@@ -280,6 +391,20 @@ fn rebuild_with_load(
     }
 }
 
+fn rebuild_with_join(
+    commands: &mut Commands,
+    menu_root: &Query<Entity, With<MenuRoot>>,
+    panels: &Query<Entity, With<MenuPanel>>,
+) {
+    for entity in panels.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    if let Some(root) = menu_root.iter().next() {
+        spawn_join_panel_under(commands, root);
+    }
+}
+
 fn rebuild_with_main(
     commands: &mut Commands,
     menu_root: &Query<Entity, With<MenuRoot>>,
@@ -291,6 +416,52 @@ fn rebuild_with_main(
 
     if let Some(root) = menu_root.iter().next() {
         spawn_main_panel_under(commands, root);
+    }
+}
+
+fn join_input_system(
+    mut char_events: MessageReader<bevy::input::keyboard::KeyboardInput>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut Text, With<JoinAddrInput>>,
+) {
+    let Ok(mut text) = query.single_mut() else {
+        return;
+    };
+
+    for event in char_events.read() {
+        if event.state != bevy::input::ButtonState::Pressed {
+            continue;
+        }
+        match event.key_code {
+            KeyCode::Backspace => {
+                text.0.pop();
+            }
+            _ => {
+                // Map key codes to characters for address input
+                let ch = key_to_char(event.key_code, keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight));
+                if let Some(c) = ch {
+                    text.0.push(c);
+                }
+            }
+        }
+    }
+}
+
+fn key_to_char(key: KeyCode, _shift: bool) -> Option<char> {
+    match key {
+        KeyCode::Digit0 | KeyCode::Numpad0 => Some('0'),
+        KeyCode::Digit1 | KeyCode::Numpad1 => Some('1'),
+        KeyCode::Digit2 | KeyCode::Numpad2 => Some('2'),
+        KeyCode::Digit3 | KeyCode::Numpad3 => Some('3'),
+        KeyCode::Digit4 | KeyCode::Numpad4 => Some('4'),
+        KeyCode::Digit5 | KeyCode::Numpad5 => Some('5'),
+        KeyCode::Digit6 | KeyCode::Numpad6 => Some('6'),
+        KeyCode::Digit7 | KeyCode::Numpad7 => Some('7'),
+        KeyCode::Digit8 | KeyCode::Numpad8 => Some('8'),
+        KeyCode::Digit9 | KeyCode::Numpad9 => Some('9'),
+        KeyCode::Period | KeyCode::NumpadDecimal => Some('.'),
+        KeyCode::Semicolon => Some(':'), // Shift+; = : on US layout
+        _ => None,
     }
 }
 

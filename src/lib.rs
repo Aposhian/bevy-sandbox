@@ -14,6 +14,7 @@ pub mod game_state;
 mod health;
 mod input;
 mod menu;
+pub mod net;
 pub mod obstacle;
 mod pathfinding;
 mod pathfollowing;
@@ -31,6 +32,7 @@ use health::HealthPlugin;
 use input::InputPlugin;
 use menu::MenuPlugin;
 use pathfollowing::PathfollowingPlugin;
+use net::NetworkPlugin;
 use save::SavePlugin;
 use simple_figure::SimpleFigurePlugin;
 
@@ -76,6 +78,7 @@ impl PluginGroup for SandboxPlugins {
             .add(DespawnPlugin)
             .add(SavePlugin)
             .add(MenuPlugin)
+            .add(NetworkPlugin)
     }
 }
 

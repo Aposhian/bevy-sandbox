@@ -1,0 +1,70 @@
+syntax = "proto3";
+package network;
+
+message Vec2 {
+  float x = 1;
+  float y = 2;
+}
+
+enum EntityKind {
+  ENTITY_KIND_PLAYER = 0;
+  ENTITY_KIND_NPC = 1;
+  ENTITY_KIND_BALL = 2;
+  ENTITY_KIND_GUEST = 3;
+}
+
+message EntityState {
+  uint64 entity_id = 1;
+  Vec2 position = 2;
+  Vec2 velocity = 3;
+  int32 health_max = 4;
+  int32 health_current = 5;
+  EntityKind kind = 6;
+}
+
+message WorldSnapshot {
+  uint64 host_tick = 1;
+  string map_path = 2;
+  repeated EntityState entities = 3;
+}
+
+message WorldUpdate {
+  uint64 host_tick = 1;
+  uint64 timestamp_us = 2;
+  repeated EntityState entities = 3;
+  repeated uint64 despawned = 4;
+}
+
+message GuestInput {
+  uint32 guest_id = 1;
+  Vec2 move_direction = 2;
+  optional Vec2 shoot_direction = 3;
+  uint64 client_tick = 4;
+}
+
+message JoinRequest {
+  string player_name = 1;
+}
+
+message JoinResponse {
+  uint32 guest_id = 1;
+  WorldSnapshot snapshot = 2;
+}
+
+message LeaveRequest {
+  uint32 guest_id = 1;
+}
+
+message Empty {}
+
+message StreamRequest {
+  uint32 guest_id = 1;
+}
+
+service GameSession {
+  rpc Join(JoinRequest) returns (JoinResponse);
+  rpc Leave(LeaveRequest) returns (Empty);
+  rpc SendInput(stream GuestInput) returns (Empty);
+  rpc StreamUpdates(StreamRequest) returns (stream WorldUpdate);
+  rpc RequestResync(StreamRequest) returns (WorldSnapshot);
+}

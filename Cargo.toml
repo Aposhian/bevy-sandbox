@@ -20,9 +20,14 @@ serde_json = "1"
 prost = "0.13"
 prost-types = "0.13"
 serde = { version = "1", features = ["derive"] }
+tonic = "0.12"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+crossbeam-channel = "0.5"
+tokio-stream = "0.1"
 
 [build-dependencies]
 prost-build = "0.13"
+tonic-build = "0.12"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
