@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::game_state::GameState;
 use crate::input::PlayerTag;
+use crate::net::GuestTag;
 use crate::pathfinding::GoalPosition;
 use crate::simple_figure::SimpleFigureTag;
 
@@ -26,7 +27,7 @@ fn zombie_follow(
     time: Res<Time>,
     mut timer: ResMut<ReplanTimer>,
     player: Query<&Transform, With<PlayerTag>>,
-    zombies: Query<Entity, (Without<PlayerTag>, With<SimpleFigureTag>)>,
+    zombies: Query<Entity, (Without<PlayerTag>, Without<GuestTag>, With<SimpleFigureTag>)>,
 ) {
     timer.0.tick(time.delta());
     if timer.0.just_finished() {

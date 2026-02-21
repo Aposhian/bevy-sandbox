@@ -60,6 +60,7 @@ pub struct JoinEvent {
 /// Data sent back to the guest after join is processed by Bevy.
 pub struct JoinResponseData {
     pub guest_id: u32,
+    pub guest_entity_id: u64,
     pub snapshot: proto::WorldSnapshot,
 }
 
@@ -118,9 +119,13 @@ pub struct GuestChannels {
     pub input_tx: tokio::sync::mpsc::Sender<proto::GuestInput>,
 }
 
-/// The guest's assigned ID from the host.
+/// The guest's assigned ID and entity ID from the host.
 #[derive(Resource)]
-pub struct LocalGuestId(pub u32);
+pub struct LocalGuestId {
+    pub guest_id: u32,
+    /// The host-side Entity bits for this guest's character.
+    pub entity_id: u64,
+}
 
 pub struct NetworkPlugin;
 

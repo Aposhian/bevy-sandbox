@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use avian2d::prelude::*;
@@ -23,7 +24,8 @@ pub struct HostPlugin;
 
 impl Plugin for HostPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<PreviousBroadcastEntities>()
+        .add_systems(
             FixedUpdate,
             (host_tick_increment, host_broadcast)
                 .chain()
@@ -75,6 +77,7 @@ impl GameSession for GameSessionService {
         Ok(Response::new(proto::JoinResponse {
             guest_id: response_data.guest_id,
             snapshot: Some(response_data.snapshot),
+            guest_entity_id: response_data.guest_entity_id,
         }))
     }
 
@@ -169,6 +172,10 @@ impl GameSession for GameSessionService {
 #[derive(Resource, Clone)]
 pub struct HostUpdateSenders(pub Arc<Mutex<Vec<(u32, mpsc::Sender<proto::WorldUpdate>)>>>);
 
+/// Tracks entity IDs from the previous broadcast to detect despawns.
+#[derive(Resource, Default)]
+struct PreviousBroadcastEntities(HashSet<u64>);
+
 /// Starts hosting: spawns the gRPC server and inserts necessary resources.
 pub fn start_hosting(world: &mut World, port: u16) {
     let channels = HostChannels::default();
@@ -214,6 +221,7 @@ fn host_tick_increment(mut tick: ResMut<HostTick>) {
 fn host_broadcast(
     tick: Res<HostTick>,
     update_senders: Option<Res<HostUpdateSenders>>,
+    mut prev_entities: ResMut<PreviousBroadcastEntities>,
     player_query: Query<
         (Entity, &Transform, &LinearVelocity, Option<&Health>),
         (With<SimpleFigureTag>, With<PlayerTag>, Without<GuestTag>),
@@ -299,6 +307,15 @@ fn host_broadcast(
         });
     }
 
+    // Compute despawned entities (were in previous broadcast but not in current)
+    let current_ids: HashSet<u64> = entities.iter().map(|e| e.entity_id).collect();
+    let despawned: Vec<u64> = prev_entities
+        .0
+        .difference(&current_ids)
+        .copied()
+        .collect();
+    prev_entities.0 = current_ids;
+
     let timestamp_us = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -308,7 +325,7 @@ fn host_broadcast(
         host_tick: tick.0,
         timestamp_us,
         entities,
-        despawned: Vec::new(), // TODO: track despawned entities
+        despawned,
     };
 
     // Send to all connected guests (non-blocking)
@@ -366,7 +383,7 @@ fn host_handle_joins(
             .map(|(_, tf, _, _)| Vec2::new(tf.translation.x + 32.0, tf.translation.y))
             .unwrap_or(Vec2::ZERO);
 
-        commands.spawn((
+        let guest_entity = commands.spawn((
             SimpleFigureTag,
             GuestTag(guest_id),
             bevy::prelude::Sprite::from_atlas_image(
@@ -392,7 +409,9 @@ fn host_handle_joins(
             CollisionEventsEnabled,
             LockedAxes::ROTATION_LOCKED,
             MoveAction::default(),
-        ));
+            LinearVelocity::default(),
+        )).id();
+        let guest_entity_bits = guest_entity.to_bits();
 
         // Build world snapshot
         let mut entities = Vec::new();
@@ -457,7 +476,7 @@ fn host_handle_joins(
         // Add the newly spawned guest entity to the snapshot
         // (it won't be in queries yet since we just spawned it, so add manually)
         entities.push(proto::EntityState {
-            entity_id: 0, // The guest will identify itself by guest_id, not entity_id
+            entity_id: guest_entity_bits,
             position: Some(proto::Vec2 {
                 x: spawn_pos.x,
                 y: spawn_pos.y,
@@ -476,6 +495,7 @@ fn host_handle_joins(
 
         let _ = join.response_tx.send(JoinResponseData {
             guest_id,
+            guest_entity_id: guest_entity_bits,
             snapshot,
         });
     }

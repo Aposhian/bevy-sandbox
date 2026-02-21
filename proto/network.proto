@@ -50,6 +50,7 @@ message JoinRequest {
 message JoinResponse {
   uint32 guest_id = 1;
   WorldSnapshot snapshot = 2;
+  uint64 guest_entity_id = 3;
 }
 
 message LeaveRequest {
