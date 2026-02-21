@@ -1,5 +1,6 @@
+use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use avian2d::prelude::*;
@@ -22,8 +23,44 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/save.rs"));
 }
 
-const MAX_SLOTS: usize = 5;
 const AUTO_SAVE_SECS: f32 = 60.0;
+
+/// GC tier thresholds in seconds.
+const GC_TIER_SECS: [u64; 3] = [5 * 60, 15 * 60, 30 * 60];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveTrigger {
+    Auto,
+    User,
+    Game,
+}
+
+impl SaveTrigger {
+    fn to_proto(self) -> i32 {
+        match self {
+            SaveTrigger::Auto => proto::SaveTrigger::Auto as i32,
+            SaveTrigger::User => proto::SaveTrigger::User as i32,
+            SaveTrigger::Game => proto::SaveTrigger::Game as i32,
+        }
+    }
+
+    pub fn from_proto(v: i32) -> Self {
+        match v {
+            1 => SaveTrigger::Auto,
+            2 => SaveTrigger::User,
+            3 => SaveTrigger::Game,
+            _ => SaveTrigger::Auto,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SaveTrigger::Auto => "Auto",
+            SaveTrigger::User => "Manual",
+            SaveTrigger::Game => "Game",
+        }
+    }
+}
 
 pub struct SavePlugin;
 
@@ -60,19 +97,19 @@ pub struct CurrentMapPath(pub String);
 
 #[derive(bevy::prelude::Message)]
 pub struct SaveGameRequest {
-    pub slot: usize,
+    pub trigger: SaveTrigger,
 }
 
 #[derive(bevy::prelude::Message)]
 pub struct LoadGameRequest {
-    pub slot: usize,
+    pub filename: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SlotInfo {
-    pub slot: usize,
     pub timestamp_secs: u64,
     pub filename: String,
+    pub trigger: i32,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -81,45 +118,120 @@ pub struct SaveIndex {
 }
 
 impl SaveIndex {
-    pub fn load(dir: &PathBuf) -> Self {
+    pub fn load(dir: &Path) -> Self {
         let path = dir.join("index.json");
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        match fs::read_to_string(&path) {
+            Ok(s) => match serde_json::from_str(&s) {
+                Ok(idx) => idx,
+                Err(e) => {
+                    warn!("Corrupt index.json ({e}), rebuilding from directory");
+                    Self::rebuild_from_directory(dir)
+                }
+            },
+            Err(_) => Self::rebuild_from_directory(dir),
+        }
     }
 
-    pub fn save(&self, dir: &PathBuf) {
+    fn rebuild_from_directory(dir: &Path) -> Self {
+        let mut slots = Vec::new();
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.starts_with("save_") && name_str.ends_with(".binpb") {
+                    if let Ok(data) = fs::read(entry.path()) {
+                        if let Ok(sg) = proto::SaveGame::decode(data.as_slice()) {
+                            slots.push(SlotInfo {
+                                timestamp_secs: sg.timestamp_secs,
+                                filename: name_str.into_owned(),
+                                trigger: sg.trigger,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        slots.sort_by(|a, b| b.timestamp_secs.cmp(&a.timestamp_secs));
+        let idx = SaveIndex { slots };
+        idx.save(dir);
+        idx
+    }
+
+    pub fn save(&self, dir: &Path) {
         let path = dir.join("index.json");
         if let Ok(json) = serde_json::to_string_pretty(self) {
             let _ = fs::write(path, json);
         }
     }
 
-    fn next_slot(&self) -> usize {
-        if self.slots.len() < MAX_SLOTS {
-            self.slots.len()
-        } else {
-            // Overwrite the oldest
-            self.slots
+    pub fn add_entry(&mut self, info: SlotInfo, dir: &Path) {
+        self.slots.push(info);
+        self.slots
+            .sort_by(|a, b| b.timestamp_secs.cmp(&a.timestamp_secs));
+        self.save(dir);
+    }
+
+    pub fn gc(&mut self, dir: &Path) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut retained: HashSet<String> = HashSet::new();
+
+        // 1. Latest auto-save
+        if let Some(s) = self
+            .slots
+            .iter()
+            .find(|s| s.trigger == proto::SaveTrigger::Auto as i32)
+        {
+            retained.insert(s.filename.clone());
+        }
+
+        // 2. Latest user-save
+        if let Some(s) = self
+            .slots
+            .iter()
+            .find(|s| s.trigger == proto::SaveTrigger::User as i32)
+        {
+            retained.insert(s.filename.clone());
+        }
+
+        // 3-5. Tiered age thresholds
+        for &threshold in &GC_TIER_SECS {
+            if let Some(s) = self
+                .slots
                 .iter()
-                .enumerate()
-                .min_by_key(|(_, s)| s.timestamp_secs)
-                .map(|(i, _)| i)
-                .unwrap_or(0)
+                .find(|s| now.saturating_sub(s.timestamp_secs) >= threshold)
+            {
+                retained.insert(s.filename.clone());
+            }
         }
-    }
 
-    pub fn find_slot(&self, slot: usize) -> Option<&SlotInfo> {
-        self.slots.iter().find(|s| s.slot == slot)
-    }
-
-    fn upsert(&mut self, info: SlotInfo) {
-        if let Some(existing) = self.slots.iter_mut().find(|s| s.slot == info.slot) {
-            *existing = info;
-        } else {
-            self.slots.push(info);
+        // If retained set is empty (no saves match criteria), keep the most recent
+        if retained.is_empty() {
+            if let Some(s) = self.slots.first() {
+                retained.insert(s.filename.clone());
+            }
         }
+
+        // Delete non-retained files
+        let to_remove: Vec<SlotInfo> = self
+            .slots
+            .iter()
+            .filter(|s| !retained.contains(&s.filename))
+            .cloned()
+            .collect();
+
+        for info in &to_remove {
+            let path = dir.join(&info.filename);
+            let _ = fs::remove_file(path);
+        }
+
+        self.slots.retain(|s| retained.contains(&s.filename));
+        self.slots
+            .sort_by(|a, b| b.timestamp_secs.cmp(&a.timestamp_secs));
+        self.save(dir);
     }
 }
 
@@ -206,9 +318,10 @@ fn execute_save(
             npcs,
             balls,
             camera_position,
+            trigger: req.trigger.to_proto(),
         };
 
-        let filename = format!("save_{}.binpb", req.slot);
+        let filename = format!("save_{now}.binpb");
         let filepath = save_dir.0.join(&filename);
         let encoded = save_game.encode_to_vec();
         if let Err(e) = fs::write(&filepath, &encoded) {
@@ -217,14 +330,21 @@ fn execute_save(
         }
 
         let mut index = SaveIndex::load(&save_dir.0);
-        index.upsert(SlotInfo {
-            slot: req.slot,
-            timestamp_secs: now,
-            filename,
-        });
-        index.save(&save_dir.0);
+        index.add_entry(
+            SlotInfo {
+                timestamp_secs: now,
+                filename: filename.clone(),
+                trigger: req.trigger.to_proto(),
+            },
+            &save_dir.0,
+        );
+        index.gc(&save_dir.0);
 
-        info!("Game saved to slot {}", req.slot);
+        info!(
+            "Game saved: {} ({})",
+            filename,
+            req.trigger.label()
+        );
     }
 }
 
@@ -244,17 +364,11 @@ fn execute_load(
     mut camera_query: Query<&mut Transform, With<Camera2d>>,
 ) {
     for req in requests.read() {
-        let index = SaveIndex::load(&save_dir.0);
-        let Some(slot_info) = index.find_slot(req.slot) else {
-            warn!("No save in slot {}", req.slot);
-            continue;
-        };
-
-        let filepath = save_dir.0.join(&slot_info.filename);
+        let filepath = save_dir.0.join(&req.filename);
         let data = match fs::read(&filepath) {
             Ok(d) => d,
             Err(e) => {
-                error!("Failed to read save file: {e}");
+                error!("Failed to read save file {}: {e}", req.filename);
                 continue;
             }
         };
@@ -426,12 +540,11 @@ fn execute_load(
             }
         }
 
-        // Remove suppress after this frame (deferred; the tilemap systems will
-        // process the spawn event next frame, then we remove suppress)
+        // Remove suppress after this frame
         commands.remove_resource::<SuppressObjectSpawn>();
 
         next_state.set(GameState::Playing);
-        info!("Game loaded from slot {}", req.slot);
+        info!("Game loaded from {}", req.filename);
     }
 }
 
@@ -439,7 +552,6 @@ fn auto_save_tick(
     time: Res<Time>,
     state: Res<State<GameState>>,
     mut timer: ResMut<AutoSaveTimer>,
-    save_dir: Res<SaveDir>,
     mut save_requests: MessageWriter<SaveGameRequest>,
 ) {
     if *state.get() != GameState::Playing {
@@ -447,9 +559,9 @@ fn auto_save_tick(
     }
     timer.0.tick(time.delta());
     if timer.0.just_finished() {
-        let index = SaveIndex::load(&save_dir.0);
-        let slot = index.next_slot();
-        save_requests.write(SaveGameRequest { slot });
-        info!("Auto-save triggered to slot {slot}");
+        save_requests.write(SaveGameRequest {
+            trigger: SaveTrigger::Auto,
+        });
+        info!("Auto-save triggered");
     }
 }

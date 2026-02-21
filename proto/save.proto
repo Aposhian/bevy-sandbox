@@ -27,6 +27,13 @@ message BallState {
   int32 collision_self_damage = 7;
 }
 
+enum SaveTrigger {
+  SAVE_TRIGGER_UNKNOWN = 0;
+  SAVE_TRIGGER_AUTO = 1;
+  SAVE_TRIGGER_USER = 2;
+  SAVE_TRIGGER_GAME = 3;
+}
+
 message SaveGame {
   uint64 timestamp_secs = 1;
   string map_path = 2;
@@ -34,4 +41,5 @@ message SaveGame {
   repeated NpcState npcs = 4;
   repeated BallState balls = 5;
   Vec2 camera_position = 6;
+  SaveTrigger trigger = 7;
 }

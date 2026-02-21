@@ -2,7 +2,7 @@ use bevy::app::AppExit;
 use bevy::prelude::*;
 
 use crate::game_state::GameState;
-use crate::save::{LoadGameRequest, SaveDir, SaveGameRequest, SaveIndex};
+use crate::save::{LoadGameRequest, SaveDir, SaveGameRequest, SaveIndex, SaveTrigger};
 
 pub struct MenuPlugin;
 
@@ -27,11 +27,10 @@ struct MenuRoot;
 #[derive(Component)]
 enum MenuAction {
     Resume,
-    ShowSave,
+    QuickSave,
     ShowLoad,
     Exit,
-    SaveToSlot(usize),
-    LoadFromSlot(usize),
+    LoadFile(String),
     Back,
 }
 
@@ -101,17 +100,12 @@ fn spawn_main_panel_under(commands: &mut Commands, parent: Entity) {
     commands.entity(panel).add_child(title);
 
     spawn_button_under(commands, panel, "Resume", MenuAction::Resume);
-    spawn_button_under(commands, panel, "Save Game", MenuAction::ShowSave);
+    spawn_button_under(commands, panel, "Save Game", MenuAction::QuickSave);
     spawn_button_under(commands, panel, "Load Game", MenuAction::ShowLoad);
     spawn_button_under(commands, panel, "Exit Game", MenuAction::Exit);
 }
 
-fn spawn_slot_panel_under(
-    commands: &mut Commands,
-    parent: Entity,
-    is_save: bool,
-    index: &SaveIndex,
-) {
+fn spawn_load_panel_under(commands: &mut Commands, parent: Entity, index: &SaveIndex) {
     let panel = commands
         .spawn((
             MenuPanel,
@@ -121,10 +115,9 @@ fn spawn_slot_panel_under(
         .id();
     commands.entity(parent).add_child(panel);
 
-    let title_text = if is_save { "Save Game" } else { "Load Game" };
     let title = commands
         .spawn((
-            Text::new(title_text),
+            Text::new("Load Game"),
             TextFont {
                 font_size: 28.0,
                 ..default()
@@ -138,21 +131,38 @@ fn spawn_slot_panel_under(
         .id();
     commands.entity(panel).add_child(title);
 
-    for slot in 0..5 {
-        let label = if let Some(info) = index.find_slot(slot) {
-            let secs = info.timestamp_secs;
-            format!("Slot {} - {}", slot + 1, format_timestamp(secs))
-        } else {
-            format!("Slot {} - Empty", slot + 1)
-        };
-
-        let action = if is_save {
-            MenuAction::SaveToSlot(slot)
-        } else {
-            MenuAction::LoadFromSlot(slot)
-        };
-
-        spawn_button_under(commands, panel, &label, action);
+    if index.slots.is_empty() {
+        let empty = commands
+            .spawn((
+                Text::new("No saves found"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.6, 0.6, 0.6)),
+                Node {
+                    margin: UiRect::bottom(Val::Px(10.0)),
+                    ..default()
+                },
+            ))
+            .id();
+        commands.entity(panel).add_child(empty);
+    } else {
+        // Slots are already sorted newest-first by SaveIndex
+        for info in &index.slots {
+            let trigger = SaveTrigger::from_proto(info.trigger);
+            let label = format!(
+                "{} - {}",
+                trigger.label(),
+                format_timestamp(info.timestamp_secs)
+            );
+            spawn_button_under(
+                commands,
+                panel,
+                &label,
+                MenuAction::LoadFile(info.filename.clone()),
+            );
+        }
     }
 
     spawn_button_under(commands, panel, "Back", MenuAction::Back);
@@ -229,21 +239,22 @@ fn menu_actions(
             MenuAction::Resume => {
                 next_state.set(GameState::Playing);
             }
-            MenuAction::ShowSave => {
-                rebuild_with_slots(&mut commands, &menu_root, &panels, true, &save_dir);
+            MenuAction::QuickSave => {
+                save_requests.write(SaveGameRequest {
+                    trigger: SaveTrigger::User,
+                });
+                next_state.set(GameState::Playing);
             }
             MenuAction::ShowLoad => {
-                rebuild_with_slots(&mut commands, &menu_root, &panels, false, &save_dir);
+                rebuild_with_load(&mut commands, &menu_root, &panels, &save_dir);
             }
             MenuAction::Exit => {
                 exit.write(AppExit::Success);
             }
-            MenuAction::SaveToSlot(slot) => {
-                save_requests.write(SaveGameRequest { slot: *slot });
-                next_state.set(GameState::Playing);
-            }
-            MenuAction::LoadFromSlot(slot) => {
-                load_requests.write(LoadGameRequest { slot: *slot });
+            MenuAction::LoadFile(filename) => {
+                load_requests.write(LoadGameRequest {
+                    filename: filename.clone(),
+                });
             }
             MenuAction::Back => {
                 rebuild_with_main(&mut commands, &menu_root, &panels);
@@ -252,11 +263,10 @@ fn menu_actions(
     }
 }
 
-fn rebuild_with_slots(
+fn rebuild_with_load(
     commands: &mut Commands,
     menu_root: &Query<Entity, With<MenuRoot>>,
     panels: &Query<Entity, With<MenuPanel>>,
-    is_save: bool,
     save_dir: &SaveDir,
 ) {
     for entity in panels.iter() {
@@ -266,7 +276,7 @@ fn rebuild_with_slots(
     let index = SaveIndex::load(&save_dir.0);
 
     if let Some(root) = menu_root.iter().next() {
-        spawn_slot_panel_under(commands, root, is_save, &index);
+        spawn_load_panel_under(commands, root, &index);
     }
 }
 
