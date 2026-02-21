@@ -13,6 +13,7 @@ use crate::ecs::BondedEntities;
 #[cfg(feature = "path_debug")]
 use crate::ecs::DespawnEvent;
 
+use crate::game_state::GameState;
 use crate::input::PlayerTag;
 use crate::simple_figure::GameLayer;
 use crate::PIXELS_PER_METER;
@@ -21,7 +22,10 @@ pub struct PathfindingPlugin;
 
 impl Plugin for PathfindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, compute_path_to_goal);
+        app.add_systems(
+            Update,
+            compute_path_to_goal.run_if(in_state(GameState::Playing)),
+        );
         #[cfg(feature = "path_debug")]
         app.add_systems(Update, draw_paths);
     }

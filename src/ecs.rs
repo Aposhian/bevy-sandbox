@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use std::ops::{Deref, DerefMut};
 
+use crate::game_state::GameState;
+
 pub struct DespawnPlugin;
 
 impl Plugin for DespawnPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DespawnEvent>()
-            .add_systems(Last, despawn);
+            .add_systems(Last, despawn.run_if(in_state(GameState::Playing)));
     }
 }
 

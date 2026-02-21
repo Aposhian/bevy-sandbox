@@ -6,8 +6,6 @@ use bevy_sandbox::{
     tiled::{TiledPlugin, TilemapSpawnEvent},
     SandboxPlugins,
 };
-use std::path::Path;
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
@@ -19,6 +17,6 @@ fn main() {
 
 fn spawn_tilemap(mut tilemap_spawn_event: MessageWriter<TilemapSpawnEvent>) {
     let _ = tilemap_spawn_event.write(TilemapSpawnEvent {
-        path: Path::new("assets/example.tmx"),
+        path: "assets/example.tmx".to_string(),
     });
 }

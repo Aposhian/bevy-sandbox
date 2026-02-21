@@ -12,6 +12,11 @@ use crate::simple_figure::{GameLayer, SimpleFigureSpawnEvent};
 
 pub struct TiledPlugin;
 
+/// When this resource is present, `process_object_layers` skips spawning
+/// objects from the Tiled map (used during load to avoid duplicate spawns).
+#[derive(Resource)]
+pub struct SuppressObjectSpawn;
+
 impl Plugin for TiledPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<TilemapSpawnEvent>()
@@ -24,7 +29,7 @@ pub struct TiledMapComponent(tiled::Map);
 
 #[derive(Message)]
 pub struct TilemapSpawnEvent {
-    pub path: &'static Path,
+    pub path: String,
 }
 
 fn load_texture(tileset: &Tileset, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
@@ -131,7 +136,7 @@ fn spawn(
 ) {
     for spawn_event in spawn_events.read() {
         let mut loader = Loader::new();
-        let tiled_map = loader.load_tmx_map(spawn_event.path).unwrap();
+        let tiled_map = loader.load_tmx_map(Path::new(&spawn_event.path)).unwrap();
 
         let tilemap_entity = commands.spawn_empty().id();
 
@@ -158,9 +163,13 @@ fn spawn(
 }
 
 fn process_object_layers(
+    suppress: Option<Res<SuppressObjectSpawn>>,
     tiled_map_query: Query<&TiledMapComponent, Changed<TiledMapComponent>>,
     mut spawn_event: MessageWriter<SimpleFigureSpawnEvent>,
 ) {
+    if suppress.is_some() {
+        return;
+    }
     for TiledMapComponent(tiled_map) in tiled_map_query.iter() {
         if let Some(object_layer) = tiled_map
             .layers()

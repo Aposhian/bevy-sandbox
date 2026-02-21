@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
 
+use crate::game_state::GameState;
 use crate::health::{CollisionDamage, CollisionSelfDamage, DamageKind, Health};
 use crate::simple_figure::GameLayer;
 use crate::PIXELS_PER_METER;
@@ -9,7 +10,7 @@ pub struct BallPlugin;
 
 /// Resource for holding ball texture
 #[derive(Resource)]
-pub struct BallTextureHandle(Handle<Image>);
+pub struct BallTextureHandle(pub Handle<Image>);
 
 impl FromWorld for BallTextureHandle {
     fn from_world(world: &mut World) -> Self {
@@ -23,7 +24,7 @@ impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<BallSpawnEvent>()
             .init_resource::<BallTextureHandle>()
-            .add_systems(Update, spawn);
+            .add_systems(Update, spawn.run_if(in_state(GameState::Playing)));
     }
 }
 

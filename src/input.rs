@@ -1,4 +1,5 @@
 use crate::ball::BallSpawnEvent;
+use crate::game_state::GameState;
 use crate::PIXELS_PER_METER;
 use avian2d::prelude::*;
 use bevy::math::Vec3Swizzles;
@@ -22,7 +23,10 @@ impl Default for ShootTimer {
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ShootTimer>()
-            .add_systems(Update, (keyboard, mouse_aim, movement));
+            .add_systems(
+                Update,
+                (keyboard, mouse_aim, movement).run_if(in_state(GameState::Playing)),
+            );
     }
 }
 

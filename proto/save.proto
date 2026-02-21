@@ -1,0 +1,37 @@
+syntax = "proto3";
+package save;
+
+message Vec2 { float x = 1; float y = 2; }
+
+message PlayerState {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+}
+
+message NpcState {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+  int32 health_max = 3;
+  int32 health_current = 4;
+  uint32 vulnerable_to_mask = 5;
+  optional Vec2 goal_position = 6;
+}
+
+message BallState {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+  int32 health_max = 3;
+  int32 health_current = 4;
+  uint32 vulnerable_to_mask = 5;
+  int32 collision_damage = 6;
+  int32 collision_self_damage = 7;
+}
+
+message SaveGame {
+  uint64 timestamp_secs = 1;
+  string map_path = 2;
+  PlayerState player = 3;
+  repeated NpcState npcs = 4;
+  repeated BallState balls = 5;
+  Vec2 camera_position = 6;
+}

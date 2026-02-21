@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_4;
 
 use crate::camera::CameraTarget;
+use crate::game_state::GameState;
 use crate::health::{DamageKind, Health};
 use crate::input::{MoveAction, PlayerTag};
 use crate::PIXELS_PER_METER;
@@ -15,7 +16,11 @@ impl Plugin for SimpleFigurePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SimpleFigureTextureAtlasHandle>()
             .add_message::<SimpleFigureSpawnEvent>()
-            .add_systems(Update, (animation_control, animate_sprite, spawn));
+            .add_systems(
+                Update,
+                (animation_control, animate_sprite, spawn)
+                    .run_if(in_state(GameState::Playing)),
+            );
     }
 }
 
@@ -36,8 +41,8 @@ const SPRITE_SHEET: SpriteSheetConfig = SpriteSheetConfig {
 /// Resource for holding texture and atlas layout
 #[derive(Resource)]
 pub struct SimpleFigureTextureAtlasHandle {
-    texture: Handle<Image>,
-    layout: Handle<TextureAtlasLayout>,
+    pub texture: Handle<Image>,
+    pub layout: Handle<TextureAtlasLayout>,
 }
 
 impl FromWorld for SimpleFigureTextureAtlasHandle {

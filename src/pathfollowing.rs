@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
 
+use crate::game_state::GameState;
 use crate::input::MoveAction;
 use crate::pathfinding::Path;
 use crate::PIXELS_PER_METER;
@@ -9,7 +10,10 @@ pub struct PathfollowingPlugin;
 
 impl Plugin for PathfollowingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (reset_carrot, go_to_carrot, goal_checker));
+        app.add_systems(
+            Update,
+            (reset_carrot, go_to_carrot, goal_checker).run_if(in_state(GameState::Playing)),
+        );
     }
 }
 

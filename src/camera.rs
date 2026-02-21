@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
+use crate::game_state::GameState;
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, camera_follow);
+            .add_systems(Update, camera_follow.run_if(in_state(GameState::Playing)));
     }
 }
 

@@ -4,12 +4,17 @@ use avian2d::prelude::*;
 use bevy::prelude::*;
 
 use crate::ecs::DespawnEvent;
+use crate::game_state::GameState;
 
 pub struct HealthPlugin;
 
 impl Plugin for HealthPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (damage, health_despawner, tick_damage_cooldown));
+        app.add_systems(
+            Update,
+            (damage, health_despawner, tick_damage_cooldown)
+                .run_if(in_state(GameState::Playing)),
+        );
     }
 }
 

@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::game_state::GameState;
 use crate::input::PlayerTag;
 use crate::pathfinding::GoalPosition;
 use crate::simple_figure::SimpleFigureTag;
@@ -9,7 +10,7 @@ pub struct AiPlugin;
 impl Plugin for AiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, zombie_follow);
+            .add_systems(Update, zombie_follow.run_if(in_state(GameState::Playing)));
     }
 }
 

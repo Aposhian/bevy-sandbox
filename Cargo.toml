@@ -17,6 +17,12 @@ bevy_ecs_tilemap = "0.18"
 pathfinding = "4"
 tiled = "0.15"
 serde_json = "1"
+prost = "0.13"
+prost-types = "0.13"
+serde = { version = "1", features = ["derive"] }
+
+[build-dependencies]
+prost-build = "0.13"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

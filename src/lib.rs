@@ -10,11 +10,14 @@ mod camera;
 mod ecs;
 #[cfg(feature = "fps_display")]
 mod fps;
+pub mod game_state;
 mod health;
 mod input;
+mod menu;
 pub mod obstacle;
 mod pathfinding;
 mod pathfollowing;
+pub mod save;
 pub mod simple_figure;
 pub mod tiled;
 
@@ -23,9 +26,12 @@ use ai::AiPlugin;
 use ball::BallPlugin;
 use camera::CameraPlugin;
 use ecs::DespawnPlugin;
+use game_state::GameStatePlugin;
 use health::HealthPlugin;
 use input::InputPlugin;
+use menu::MenuPlugin;
 use pathfollowing::PathfollowingPlugin;
+use save::SavePlugin;
 use simple_figure::SimpleFigurePlugin;
 
 /// Pixels per physics meter, used to convert between world (pixel) coordinates
@@ -58,6 +64,7 @@ impl PluginGroup for SandboxPlugins {
 
         builder
             .add(DefaultResources)
+            .add(GameStatePlugin)
             .add(InputPlugin)
             .add(SimpleFigurePlugin)
             .add(CameraPlugin)
@@ -67,6 +74,8 @@ impl PluginGroup for SandboxPlugins {
             .add(PathfollowingPlugin)
             .add(AiPlugin)
             .add(DespawnPlugin)
+            .add(SavePlugin)
+            .add(MenuPlugin)
     }
 }
 
