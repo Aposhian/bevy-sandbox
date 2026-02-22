@@ -34,7 +34,7 @@ fn zombie_follow(
         if let Some(player_transform) = player.iter().next() {
             let player_pos = player_transform.translation.truncate();
             for entity in zombies.iter() {
-                info!("Resetting zombie goal");
+                debug!("Resetting zombie goal");
                 commands.entity(entity).insert(GoalPosition {
                     position: player_pos,
                 });

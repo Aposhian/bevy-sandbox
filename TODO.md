@@ -55,3 +55,7 @@
 - [ ] Inventory database
 - [ ] Dialogue engine
 - [ ] Cinematic engine
+
+## Bugs
+- [ ] Better guest interpolation or tick sync (no jitter)
+- [ ] More efficient host broadcast rate
