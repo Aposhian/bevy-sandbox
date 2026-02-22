@@ -22,6 +22,8 @@ pub mod save;
 pub mod simple_figure;
 pub mod tiled;
 
+use bevy_ecs_tilemap::prelude::TilemapPlugin;
+
 use crate::pathfinding::PathfindingPlugin;
 use ai::AiPlugin;
 use ball::BallPlugin;
@@ -35,6 +37,7 @@ use pathfollowing::PathfollowingPlugin;
 use net::NetworkPlugin;
 use save::SavePlugin;
 use simple_figure::SimpleFigurePlugin;
+use tiled::TiledPlugin;
 
 /// Pixels per physics meter, used to convert between world (pixel) coordinates
 /// and game-logic "meter" coordinates.
@@ -76,6 +79,8 @@ impl PluginGroup for SandboxPlugins {
             .add(PathfollowingPlugin)
             .add(AiPlugin)
             .add(DespawnPlugin)
+            .add(TiledPlugin)
+            .add(TilemapPlugin)
             .add(SavePlugin)
             .add(MenuPlugin)
             .add(NetworkPlugin)

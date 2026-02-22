@@ -6,6 +6,7 @@ pub struct GameStatePlugin;
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
     #[default]
+    MainMenu,
     Playing,
     Paused,
 }
@@ -28,6 +29,7 @@ fn toggle_pause(
         match state.get() {
             GameState::Playing => next_state.set(GameState::Paused),
             GameState::Paused => next_state.set(GameState::Playing),
+            GameState::MainMenu => {} // ignore ESC on main menu
         }
     }
 }

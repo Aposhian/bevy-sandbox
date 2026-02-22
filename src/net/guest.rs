@@ -150,9 +150,11 @@ pub fn start_guest_connection(world: &mut World, addr: String) {
             info!("Joined as guest {guest_id}, entity_id={guest_entity_id}");
 
             // Store the input sender in a way the guest input system can use
+            // Don't store update_tx — only the background thread holds the sender.
+            // When the host disconnects, the sender drops and update_rx sees Disconnected.
+            drop(update_tx);
             let guest_channels = GuestChannels {
                 update_rx,
-                update_tx,
                 input_tx,
             };
 
@@ -399,6 +401,11 @@ fn guest_apply_updates(
     >,
     mut sync_state: Option<ResMut<super::sync::TickSyncState>>,
     player_query: Query<Entity, With<PlayerTag>>,
+    mut next_state: ResMut<NextState<GameState>>,
+    figures: Query<Entity, With<SimpleFigureTag>>,
+    balls: Query<Entity, With<BallTag>>,
+    maps: Query<Entity, With<crate::tiled::TiledMapComponent>>,
+    walls: Query<Entity, With<crate::tiled::WallTag>>,
 ) {
     let Some(channels) = guest_channels else {
         return;
@@ -417,6 +424,42 @@ fn guest_apply_updates(
     while let Ok(update) = channels.update_rx.try_recv() {
         all_despawned.extend_from_slice(&update.despawned);
         latest_update = Some(update);
+    }
+
+    // If no updates received, check if channel is disconnected (host dropped).
+    // Since the guest doesn't hold the Sender, a disconnected receiver means
+    // the background streaming thread (and thus the host connection) is gone.
+    if latest_update.is_none() {
+        // Peek with try_recv one more time to distinguish Empty from Disconnected
+        match channels.update_rx.try_recv() {
+            Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                warn!("Host disconnected, returning to main menu");
+                commands.remove_resource::<GuestChannels>();
+                commands.remove_resource::<LocalGuestId>();
+                commands.remove_resource::<EntityMap>();
+                commands.insert_resource(NetworkRole::Offline);
+                for entity in figures.iter() {
+                    commands.entity(entity).despawn();
+                }
+                for entity in balls.iter() {
+                    commands.entity(entity).despawn();
+                }
+                for entity in maps.iter() {
+                    commands.entity(entity).despawn();
+                }
+                for entity in walls.iter() {
+                    commands.entity(entity).despawn();
+                }
+                next_state.set(GameState::MainMenu);
+                return;
+            }
+            Err(crossbeam_channel::TryRecvError::Empty) => return,
+            Ok(update) => {
+                // Got a late update after all
+                all_despawned.extend_from_slice(&update.despawned);
+                latest_update = Some(update);
+            }
+        }
     }
 
     let Some(update) = latest_update else { return };

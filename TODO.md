@@ -59,3 +59,10 @@
 ## Bugs
 - [ ] Better guest interpolation or tick sync (no jitter)
 - [ ] More efficient host broadcast rate
+- [ ] Pixel flicker on sprites
+- [ ] Tiled object rotations not handled correctly
+
+## Chores
+- [ ] Add unit tests
+- [ ] Add testing/simulation harness for AI code agents
+- [ ]

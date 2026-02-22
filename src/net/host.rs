@@ -215,6 +215,19 @@ pub fn start_hosting(world: &mut World, port: u16) {
     world.insert_resource(NetworkRole::Host { port });
 }
 
+/// Stops hosting: removes host resources and sets role to Offline.
+/// Guest entity cleanup is the caller's responsibility.
+pub fn stop_hosting(world: &mut World) {
+    world.remove_resource::<HostChannels>();
+    world.remove_resource::<HostUpdateSenders>();
+    world.remove_resource::<super::GuestUpdateSenders>();
+    if let Some(mut connected) = world.get_resource_mut::<ConnectedGuests>() {
+        connected.0.clear();
+    }
+    world.insert_resource(NetworkRole::Offline);
+    info!("Stopped hosting");
+}
+
 fn host_tick_increment(mut tick: ResMut<HostTick>) {
     tick.0 += 1;
 }

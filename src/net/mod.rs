@@ -120,7 +120,6 @@ pub struct GuestUpdateSenders {
 #[derive(Resource)]
 pub struct GuestChannels {
     pub update_rx: Receiver<proto::WorldUpdate>,
-    pub update_tx: Sender<proto::WorldUpdate>,
     pub input_tx: tokio::sync::mpsc::Sender<proto::GuestInput>,
 }
 
