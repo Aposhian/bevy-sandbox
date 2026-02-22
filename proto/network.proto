@@ -35,6 +35,7 @@ message WorldUpdate {
   uint64 timestamp_us = 2;
   repeated EntityState entities = 3;
   repeated uint64 despawned = 4;
+  bool all_paused = 5;
 }
 
 message GuestInput {
@@ -42,6 +43,7 @@ message GuestInput {
   Vec2 move_direction = 2;
   optional Vec2 shoot_direction = 3;
   uint64 client_tick = 4;
+  bool paused = 5;
 }
 
 message JoinRequest {

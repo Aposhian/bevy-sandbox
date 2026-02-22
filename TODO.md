@@ -37,6 +37,7 @@
   - [ ] dialogue volume
 - [ ] Cheat codes!
 - [ ] Achievements
+- [ ] Multiplayer unanimous pause
 
 ### Debug
 - [ ] Show connected guests

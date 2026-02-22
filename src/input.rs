@@ -90,7 +90,16 @@ fn mouse_aim(
     player_query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut ball_spawn_event: MessageWriter<BallSpawnEvent>,
+    ui_interaction: Query<&Interaction, With<Button>>,
 ) {
+    // Don't fire when clicking on UI buttons
+    let clicking_ui = ui_interaction
+        .iter()
+        .any(|i| *i != Interaction::None);
+    if clicking_ui {
+        return;
+    }
+
     let just_pressed = buttons.just_pressed(MouseButton::Left);
     let held = buttons.pressed(MouseButton::Left);
 

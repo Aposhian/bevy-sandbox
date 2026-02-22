@@ -75,7 +75,27 @@ pub struct GuestInputEvent {
     pub move_direction: Vec2,
     pub shoot_direction: Option<Vec2>,
     pub client_tick: u64,
+    pub paused: bool,
 }
+
+/// Tracks which players want the game paused.
+/// Physics only pauses when ALL players (host + every guest) have voted to pause.
+#[derive(Resource, Default, Debug)]
+pub struct PauseVotes {
+    pub host_paused: bool,
+    pub guest_paused: HashMap<u32, bool>,
+}
+
+impl PauseVotes {
+    /// Returns true if the host and every connected guest has voted to pause.
+    pub fn all_paused(&self) -> bool {
+        self.host_paused && self.guest_paused.values().all(|&p| p)
+    }
+}
+
+/// Guest-side resource tracking whether the host reports all players paused.
+#[derive(Resource, Default)]
+pub struct HostAllPaused(pub bool);
 
 /// A leave notification from a guest.
 pub struct LeaveEvent {
@@ -138,6 +158,8 @@ impl Plugin for NetworkPlugin {
         app.init_resource::<NetworkRole>()
             .init_resource::<HostTick>()
             .init_resource::<GuestIdCounter>()
+            .init_resource::<PauseVotes>()
+            .init_resource::<HostAllPaused>()
             .add_plugins(host::HostPlugin)
             .add_plugins(guest::GuestPlugin)
             .add_plugins(sync::SyncPlugin);

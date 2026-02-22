@@ -16,8 +16,8 @@ use crate::PIXELS_PER_METER;
 use super::proto::game_session_server::{GameSession, GameSessionServer};
 use super::proto::{self};
 use super::{
-    ConnectedGuests, GuestIdCounter, GuestInputEvent, GuestTag, HostChannels, HostTick,
-    JoinEvent, JoinResponseData, LeaveEvent, NetworkRole,
+    ConnectedGuests, GuestIdCounter, GuestInputEvent, GuestTag, HostChannels, HostTick, JoinEvent,
+    JoinResponseData, LeaveEvent, NetworkRole, PauseVotes,
 };
 
 pub struct HostPlugin;
@@ -25,20 +25,32 @@ pub struct HostPlugin;
 impl Plugin for HostPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PreviousBroadcastEntities>()
-        .init_resource::<ConnectedGuests>()
-        .add_systems(
-            FixedUpdate,
-            (host_tick_increment, host_broadcast)
-                .chain()
-                .run_if(is_host)
-                .run_if(in_state(GameState::Playing)),
-        )
-        .add_systems(
-            Update,
-            (host_handle_joins, host_handle_leaves, host_receive_input)
-                .run_if(is_host)
-                .run_if(in_state(GameState::Playing)),
-        );
+            .init_resource::<ConnectedGuests>()
+            .add_systems(
+                FixedUpdate,
+                (host_tick_increment, host_broadcast)
+                    .chain()
+                    .run_if(is_host)
+                    .run_if(not(in_state(GameState::MainMenu))),
+            )
+            .add_systems(
+                Update,
+                host_handle_joins
+                    .run_if(is_host)
+                    .run_if(not(in_state(GameState::MainMenu))),
+            )
+            .add_systems(
+                Update,
+                (host_handle_leaves, host_receive_input)
+                    .run_if(is_host)
+                    .run_if(not(in_state(GameState::MainMenu))),
+            )
+            .add_systems(
+                Update,
+                host_notify_pause_change
+                    .run_if(is_host)
+                    .run_if(not(in_state(GameState::MainMenu))),
+            );
     }
 }
 
@@ -122,6 +134,7 @@ impl GameSession for GameSessionService {
                 move_direction: move_dir,
                 shoot_direction: shoot_dir,
                 client_tick: input.client_tick,
+                paused: input.paused,
             });
         }
 
@@ -156,7 +169,9 @@ impl GameSession for GameSessionService {
             }
         });
 
-        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(result_rx)))
+        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
+            result_rx,
+        )))
     }
 
     async fn request_resync(
@@ -224,6 +239,9 @@ pub fn stop_hosting(world: &mut World) {
     if let Some(mut connected) = world.get_resource_mut::<ConnectedGuests>() {
         connected.0.clear();
     }
+    if let Some(mut pause_votes) = world.get_resource_mut::<PauseVotes>() {
+        *pause_votes = PauseVotes::default();
+    }
     world.insert_resource(NetworkRole::Offline);
     info!("Stopped hosting");
 }
@@ -236,20 +254,23 @@ fn host_broadcast(
     tick: Res<HostTick>,
     update_senders: Option<Res<HostUpdateSenders>>,
     mut prev_entities: ResMut<PreviousBroadcastEntities>,
+    pause_votes: Res<PauseVotes>,
     player_query: Query<
         (Entity, &Transform, &LinearVelocity, Option<&Health>),
         (With<SimpleFigureTag>, With<PlayerTag>, Without<GuestTag>),
     >,
     npc_query: Query<
         (Entity, &Transform, &LinearVelocity, &Health),
-        (
-            With<SimpleFigureTag>,
-            Without<PlayerTag>,
-            Without<GuestTag>,
-        ),
+        (With<SimpleFigureTag>, Without<PlayerTag>, Without<GuestTag>),
     >,
     guest_query: Query<
-        (Entity, &Transform, &LinearVelocity, &GuestTag, Option<&Health>),
+        (
+            Entity,
+            &Transform,
+            &LinearVelocity,
+            &GuestTag,
+            Option<&Health>,
+        ),
         With<SimpleFigureTag>,
     >,
     ball_query: Query<(Entity, &Transform, &LinearVelocity, &Health), With<BallTag>>,
@@ -326,11 +347,7 @@ fn host_broadcast(
 
     // Compute despawned entities (were in previous broadcast but not in current)
     let current_ids: HashSet<u64> = entities.iter().map(|e| e.entity_id).collect();
-    let despawned: Vec<u64> = prev_entities
-        .0
-        .difference(&current_ids)
-        .copied()
-        .collect();
+    let despawned: Vec<u64> = prev_entities.0.difference(&current_ids).copied().collect();
     prev_entities.0 = current_ids;
 
     let timestamp_us = std::time::SystemTime::now()
@@ -343,6 +360,7 @@ fn host_broadcast(
         timestamp_us,
         entities,
         despawned,
+        all_paused: pause_votes.all_paused(),
     };
 
     // Send to all connected guests (non-blocking)
@@ -372,15 +390,17 @@ fn host_handle_joins(
     >,
     npc_query: Query<
         (Entity, &Transform, &LinearVelocity, &Health),
-        (
-            With<SimpleFigureTag>,
-            Without<PlayerTag>,
-            Without<GuestTag>,
-        ),
+        (With<SimpleFigureTag>, Without<PlayerTag>, Without<GuestTag>),
     >,
     ball_query: Query<(Entity, &Transform, &LinearVelocity, &Health), With<BallTag>>,
     guest_figure_query: Query<
-        (Entity, &Transform, &LinearVelocity, &GuestTag, Option<&Health>),
+        (
+            Entity,
+            &Transform,
+            &LinearVelocity,
+            &GuestTag,
+            Option<&Health>,
+        ),
         With<SimpleFigureTag>,
     >,
 ) {
@@ -388,10 +408,7 @@ fn host_handle_joins(
 
     while let Ok(join) = channels.join_rx.try_recv() {
         let guest_id = guest_id_counter.next();
-        info!(
-            "Guest '{}' joining with id {guest_id}",
-            join.player_name
-        );
+        info!("Guest '{}' joining with id {guest_id}", join.player_name);
 
         // Spawn a new SimpleFigure for the guest
         // Place near the host player using offset based on guest count
@@ -409,34 +426,39 @@ fn host_handle_joins(
             })
             .unwrap_or(Vec2::ZERO);
 
-        let guest_entity = commands.spawn((
-            SimpleFigureTag,
-            GuestTag(guest_id),
-            bevy::prelude::Sprite::from_atlas_image(
-                atlas_handle.texture.clone(),
-                bevy::prelude::TextureAtlas {
-                    layout: atlas_handle.layout.clone(),
-                    index: 0,
-                },
-            ),
-            Transform::from_translation(Vec3::new(spawn_pos.x, spawn_pos.y, 2.0)),
-            crate::simple_figure::AnimationIndices { first: 0, last: 2 },
-            crate::simple_figure::AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-            RigidBody::Dynamic,
-            Collider::capsule(0.18 * PIXELS_PER_METER, 0.6 * PIXELS_PER_METER),
-            CollisionLayers::new(
-                LayerMask::from([crate::simple_figure::GameLayer::Character]),
-                LayerMask::from([
-                    crate::simple_figure::GameLayer::Character,
-                    crate::simple_figure::GameLayer::Wall,
-                    crate::simple_figure::GameLayer::Ball,
-                ]),
-            ),
-            CollisionEventsEnabled,
-            LockedAxes::ROTATION_LOCKED,
-            MoveAction::default(),
-            LinearVelocity::default(),
-        )).id();
+        let guest_entity = commands
+            .spawn((
+                SimpleFigureTag,
+                GuestTag(guest_id),
+                bevy::prelude::Sprite::from_atlas_image(
+                    atlas_handle.texture.clone(),
+                    bevy::prelude::TextureAtlas {
+                        layout: atlas_handle.layout.clone(),
+                        index: 0,
+                    },
+                ),
+                Transform::from_translation(Vec3::new(spawn_pos.x, spawn_pos.y, 2.0)),
+                crate::simple_figure::AnimationIndices { first: 0, last: 2 },
+                crate::simple_figure::AnimationTimer(Timer::from_seconds(
+                    0.1,
+                    TimerMode::Repeating,
+                )),
+                RigidBody::Dynamic,
+                Collider::capsule(0.18 * PIXELS_PER_METER, 0.6 * PIXELS_PER_METER),
+                CollisionLayers::new(
+                    LayerMask::from([crate::simple_figure::GameLayer::Character]),
+                    LayerMask::from([
+                        crate::simple_figure::GameLayer::Character,
+                        crate::simple_figure::GameLayer::Wall,
+                        crate::simple_figure::GameLayer::Ball,
+                    ]),
+                ),
+                CollisionEventsEnabled,
+                LockedAxes::ROTATION_LOCKED,
+                MoveAction::default(),
+                LinearVelocity::default(),
+            ))
+            .id();
         let guest_entity_bits = guest_entity.to_bits();
 
         connected_guests.0.insert(guest_id, guest_entity);
@@ -538,12 +560,14 @@ fn host_handle_leaves(
     channels: Option<Res<HostChannels>>,
     mut connected_guests: ResMut<ConnectedGuests>,
     guest_query: Query<(Entity, &GuestTag)>,
+    mut pause_votes: ResMut<PauseVotes>,
 ) {
     let Some(channels) = channels else { return };
 
     while let Ok(leave) = channels.leave_rx.try_recv() {
         info!("Guest {} leaving", leave.guest_id);
         connected_guests.0.remove(&leave.guest_id);
+        pause_votes.guest_paused.remove(&leave.guest_id);
         for (entity, tag) in guest_query.iter() {
             if tag.0 == leave.guest_id {
                 commands.entity(entity).despawn();
@@ -604,7 +628,10 @@ pub fn respawn_connected_guests(
             ))
             .id();
 
-        info!("Respawned guest {guest_id} as entity {new_entity:?} at ({}, {})", spawn_pos.x, spawn_pos.y);
+        info!(
+            "Respawned guest {guest_id} as entity {new_entity:?} at ({}, {})",
+            spawn_pos.x, spawn_pos.y
+        );
         *entity = new_entity;
     }
 }
@@ -614,10 +641,21 @@ fn host_receive_input(
     mut guest_query: Query<(&GuestTag, &mut MoveAction)>,
     mut ball_spawn: MessageWriter<BallSpawnEvent>,
     guest_transform_query: Query<(&GuestTag, &Transform)>,
+    mut pause_votes: ResMut<PauseVotes>,
 ) {
     let Some(channels) = channels else { return };
 
     while let Ok(input) = channels.input_rx.try_recv() {
+        // Track guest pause vote
+        pause_votes
+            .guest_paused
+            .insert(input.guest_id, input.paused);
+
+        if input.paused {
+            info!("Guest {} has paused", input.guest_id);
+            continue;
+        }
+
         for (tag, mut move_action) in guest_query.iter_mut() {
             if tag.0 == input.guest_id {
                 move_action.desired_velocity = input.move_direction;
@@ -638,4 +676,40 @@ fn host_receive_input(
             }
         }
     }
+}
+
+/// When `PauseVotes` changes, send a lightweight WorldUpdate to all guests
+/// so they learn about the new `all_paused` state. This is needed because
+/// once physics pauses, FixedUpdate stops and the normal broadcast no longer fires.
+fn host_notify_pause_change(
+    pause_votes: Res<PauseVotes>,
+    tick: Res<HostTick>,
+    update_senders: Option<Res<HostUpdateSenders>>,
+) {
+    if !pause_votes.is_changed() {
+        return;
+    }
+    let Some(update_senders) = update_senders else {
+        return;
+    };
+
+    let timestamp_us = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    let update = proto::WorldUpdate {
+        host_tick: tick.0,
+        timestamp_us,
+        entities: Vec::new(),
+        despawned: Vec::new(),
+        all_paused: pause_votes.all_paused(),
+    };
+
+    let senders = update_senders.0.clone();
+    if let Ok(guard) = senders.try_lock() {
+        for (_guest_id, sender) in guard.iter() {
+            let _ = sender.try_send(update.clone());
+        }
+    };
 }

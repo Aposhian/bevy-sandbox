@@ -4,7 +4,7 @@ use avian2d::prelude::*;
 use bevy::prelude::*;
 
 use super::proto::{self};
-use super::{GuestChannels, LocalGuestId, NetworkRole};
+use super::{GuestChannels, HostAllPaused, LocalGuestId, NetworkRole};
 use crate::ball::{BallTag, BallTextureHandle};
 use crate::camera::CameraTarget;
 use crate::game_state::GameState;
@@ -23,9 +23,23 @@ impl Plugin for GuestPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (guest_send_input, guest_apply_updates)
+            guest_send_input
                 .run_if(is_guest)
                 .run_if(in_state(GameState::Playing)),
+        )
+        .add_systems(
+            Update,
+            guest_apply_updates
+                .run_if(is_guest)
+                .run_if(not(in_state(GameState::MainMenu))),
+        )
+        .add_systems(
+            OnEnter(GameState::Paused),
+            guest_send_pause_state.run_if(is_guest),
+        )
+        .add_systems(
+            OnEnter(GameState::Playing),
+            guest_send_pause_state.run_if(is_guest),
         )
         .add_systems(
             Update,
@@ -320,6 +334,7 @@ fn guest_send_input(
     buttons: Res<ButtonInput<MouseButton>>,
     guest_channels: Option<Res<GuestChannels>>,
     local_guest: Option<Res<LocalGuestId>>,
+    state: Res<State<GameState>>,
     window_query: Query<&Window, With<bevy::window::PrimaryWindow>>,
     player_query: Query<&GlobalTransform, With<PlayerTag>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
@@ -383,6 +398,33 @@ fn guest_send_input(
         }),
         shoot_direction: shoot_direction.map(|d| proto::Vec2 { x: d.x, y: d.y }),
         client_tick: 0, // TODO: use local tick counter
+        paused: matches!(state.get(), GameState::Paused),
+    };
+
+    let _ = channels.input_tx.try_send(input);
+}
+
+/// Sends a single input message with the current pause state on state transitions.
+/// This ensures the host learns about pause/unpause even though `guest_send_input`
+/// only runs in `GameState::Playing`.
+fn guest_send_pause_state(
+    guest_channels: Option<Res<GuestChannels>>,
+    local_guest: Option<Res<LocalGuestId>>,
+    state: Res<State<GameState>>,
+) {
+    let Some(channels) = guest_channels else {
+        return;
+    };
+    let Some(local_guest) = local_guest else {
+        return;
+    };
+
+    let input = proto::GuestInput {
+        guest_id: local_guest.guest_id,
+        move_direction: Some(proto::Vec2 { x: 0.0, y: 0.0 }),
+        shoot_direction: None,
+        client_tick: 0,
+        paused: matches!(state.get(), GameState::Paused),
     };
 
     let _ = channels.input_tx.try_send(input);
@@ -406,6 +448,7 @@ fn guest_apply_updates(
     balls: Query<Entity, With<BallTag>>,
     maps: Query<Entity, With<crate::tiled::TiledMapComponent>>,
     walls: Query<Entity, With<crate::tiled::WallTag>>,
+    mut host_all_paused: ResMut<HostAllPaused>,
 ) {
     let Some(channels) = guest_channels else {
         return;
@@ -463,6 +506,9 @@ fn guest_apply_updates(
     }
 
     let Some(update) = latest_update else { return };
+
+    // Track host's all_paused state
+    host_all_paused.0 = update.all_paused;
 
     // Update tick sync
     if let Some(ref mut sync) = sync_state {

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::ball::BallTag;
 use crate::game_state::GameState;
-use crate::net::{ConnectedGuests, GuestTag, NetworkRole};
+use crate::net::{ConnectedGuests, GuestTag, HostAllPaused, NetworkRole, PauseVotes};
 use crate::save::{LoadGameRequest, SaveDir, SaveGameRequest, SaveIndex, SaveTrigger};
 use crate::simple_figure::SimpleFigureTag;
 use crate::tiled::{TiledMapComponent, TilemapSpawnEvent, WallTag};
@@ -22,6 +22,8 @@ impl Plugin for MenuPlugin {
                     button_interactions.run_if(in_menu),
                     menu_actions.run_if(in_menu),
                     join_input_system.run_if(in_menu),
+                    update_pause_title
+                        .run_if(in_state(GameState::Paused)),
                 ),
             );
     }
@@ -51,6 +53,9 @@ enum MenuAction {
 
 #[derive(Component)]
 struct MenuPanel;
+
+#[derive(Component)]
+struct PauseTitleText;
 
 fn in_menu(state: Res<State<GameState>>) -> bool {
     matches!(state.get(), GameState::Paused | GameState::MainMenu)
@@ -125,6 +130,8 @@ fn spawn_pause_menu(
     mut commands: Commands,
     role: Res<NetworkRole>,
     connected_guests: Res<ConnectedGuests>,
+    pause_votes: Res<PauseVotes>,
+    host_all_paused: Res<HostAllPaused>,
 ) {
     let root = commands
         .spawn((
@@ -142,7 +149,12 @@ fn spawn_pause_menu(
         ))
         .id();
 
-    spawn_pause_panel_under(&mut commands, root, &role, &connected_guests);
+    let all_paused = match *role {
+        NetworkRole::Offline => true,
+        NetworkRole::Host { .. } => pause_votes.all_paused(),
+        NetworkRole::Guest { .. } => host_all_paused.0,
+    };
+    spawn_pause_panel_under(&mut commands, root, &role, &connected_guests, all_paused);
 }
 
 fn spawn_pause_panel_under(
@@ -150,6 +162,7 @@ fn spawn_pause_panel_under(
     parent: Entity,
     role: &NetworkRole,
     connected_guests: &ConnectedGuests,
+    all_paused: bool,
 ) {
     let panel = commands
         .spawn((
@@ -160,10 +173,12 @@ fn spawn_pause_panel_under(
         .id();
     commands.entity(parent).add_child(panel);
 
-    // Title
+    // Title — only show "PAUSED" when all players have paused
+    let title_text = if all_paused { "PAUSED" } else { "MENU" };
     let title = commands
         .spawn((
-            Text::new("PAUSED"),
+            PauseTitleText,
+            Text::new(title_text),
             TextFont {
                 font_size: 32.0,
                 ..default()
@@ -522,7 +537,7 @@ fn menu_actions(
     panels: Query<Entity, With<MenuPanel>>,
     join_input: Query<&Text, With<JoinAddrInput>>,
     gameplay_entities: Query<Entity, Or<(With<SimpleFigureTag>, With<BallTag>, With<TiledMapComponent>, With<WallTag>)>>,
-    guest_entities: Query<Entity, With<GuestTag>>,
+    (guest_entities, pause_votes): (Query<Entity, With<GuestTag>>, Res<PauseVotes>),
 ) {
     for (interaction, action) in interaction_query.iter() {
         if *interaction != Interaction::Pressed {
@@ -584,13 +599,14 @@ fn menu_actions(
                 commands.queue(|world: &mut World| {
                     crate::net::host::stop_hosting(world);
                 });
-                // Rebuild pause menu to reflect new state
+                // Rebuild pause menu to reflect new state (now offline, so all_paused = true)
                 rebuild_with_pause(
                     &mut commands,
                     &menu_root,
                     &panels,
                     &NetworkRole::Offline,
                     &connected_guests,
+                    true,
                 );
             }
             MenuAction::Disconnect => {
@@ -648,12 +664,14 @@ fn menu_actions(
                         rebuild_with_main_menu(&mut commands, &menu_root, &panels);
                     }
                     _ => {
+                        let all_paused = matches!(*role, NetworkRole::Offline) || pause_votes.all_paused();
                         rebuild_with_pause(
                             &mut commands,
                             &menu_root,
                             &panels,
                             &role,
                             &connected_guests,
+                            all_paused,
                         );
                     }
                 }
@@ -718,13 +736,38 @@ fn rebuild_with_pause(
     panels: &Query<Entity, With<MenuPanel>>,
     role: &NetworkRole,
     connected_guests: &ConnectedGuests,
+    all_paused: bool,
 ) {
     for entity in panels.iter() {
         commands.entity(entity).despawn();
     }
 
     if let Some(root) = menu_root.iter().next() {
-        spawn_pause_panel_under(commands, root, role, connected_guests);
+        spawn_pause_panel_under(commands, root, role, connected_guests, all_paused);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Live pause title update
+// ---------------------------------------------------------------------------
+
+fn update_pause_title(
+    role: Res<NetworkRole>,
+    pause_votes: Res<PauseVotes>,
+    host_all_paused: Res<HostAllPaused>,
+    mut title_query: Query<&mut Text, With<PauseTitleText>>,
+) {
+    if !pause_votes.is_changed() && !host_all_paused.is_changed() {
+        return;
+    }
+    let all_paused = match *role {
+        NetworkRole::Offline => true,
+        NetworkRole::Host { .. } => pause_votes.all_paused(),
+        NetworkRole::Guest { .. } => host_all_paused.0,
+    };
+    let new_text = if all_paused { "PAUSED" } else { "MENU" };
+    for mut text in title_query.iter_mut() {
+        text.0 = new_text.to_string();
     }
 }
 
