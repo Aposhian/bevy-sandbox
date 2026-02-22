@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use crossbeam_channel::{Receiver, Sender};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -28,6 +29,10 @@ impl Default for NetworkRole {
 /// Marks an entity as controlled by a remote guest.
 #[derive(Component)]
 pub struct GuestTag(pub u32);
+
+/// Tracks connected guests: guest_id → entity.
+#[derive(Resource, Default)]
+pub struct ConnectedGuests(pub HashMap<u32, Entity>);
 
 /// Authoritative tick counter on the host, incremented each FixedUpdate.
 #[derive(Resource, Default)]

@@ -421,6 +421,7 @@ fn execute_load(
     ball_texture: Res<BallTextureHandle>,
     mut tilemap_spawn: MessageWriter<TilemapSpawnEvent>,
     mut camera_query: Query<&mut Transform, With<Camera2d>>,
+    mut connected_guests: Option<ResMut<crate::net::ConnectedGuests>>,
 ) {
     for req in requests.read() {
         let filepath = save_dir.0.join(&req.filename);
@@ -596,6 +597,24 @@ fn execute_load(
             if let Ok(mut cam_tf) = camera_query.single_mut() {
                 cam_tf.translation.x = cam_pos.x;
                 cam_tf.translation.y = cam_pos.y;
+            }
+        }
+
+        // Respawn connected guests near the host player (if hosting)
+        if let Some(ref mut connected_guests) = connected_guests {
+            if !connected_guests.0.is_empty() {
+                let host_pos = save_game
+                    .player
+                    .as_ref()
+                    .and_then(|p| p.position.as_ref())
+                    .map(|p| Vec2::new(p.x, p.y))
+                    .unwrap_or_default();
+                crate::net::host::respawn_connected_guests(
+                    &mut commands,
+                    connected_guests,
+                    host_pos,
+                    &atlas_handle,
+                );
             }
         }
 

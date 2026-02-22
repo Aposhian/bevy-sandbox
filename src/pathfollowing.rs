@@ -30,7 +30,7 @@ impl Default for Carrot {
 
 fn reset_carrot(mut commands: Commands, q: Query<Entity, Or<(Added<Path>, Changed<Path>)>>) {
     for entity in q.iter() {
-        info!("Inserting or resetting carrot");
+        debug!("Inserting or resetting carrot");
         commands.entity(entity).insert(Carrot::default());
     }
 }
@@ -65,9 +65,9 @@ fn goal_checker(
             let current_position = transform.translation.truncate() / PIXELS_PER_METER;
             if carrot_position.distance_squared(current_position) < GOAL_TOLERANCE {
                 carrot.index += 1;
-                info!("Reached carrot {}", carrot.index);
+                debug!("Reached carrot {}", carrot.index);
                 if carrot.index >= path.points.len() {
-                    info!("Removing Carrot and Path");
+                    debug!("Removing Carrot and Path");
                     vel.0 = Vec2::ZERO;
                     commands.entity(entity).remove::<Path>().remove::<Carrot>();
                 }

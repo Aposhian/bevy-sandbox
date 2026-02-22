@@ -7,11 +7,11 @@ use std::ops::Add;
 use std::ops::Sub;
 
 #[cfg(feature = "path_debug")]
-use bevy_prototype_lyon::prelude::*;
-#[cfg(feature = "path_debug")]
 use crate::ecs::BondedEntities;
 #[cfg(feature = "path_debug")]
 use crate::ecs::DespawnEvent;
+#[cfg(feature = "path_debug")]
+use bevy_prototype_lyon::prelude::*;
 
 use crate::game_state::GameState;
 use crate::input::PlayerTag;
@@ -135,15 +135,15 @@ fn compute_path_to_goal(
 
         let start_grid = GridPoint::from(start_pos);
         let goal_grid = GridPoint::from(goal_pos);
-        info!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
+        debug!("start_grid: {:?}, goal_grid: {:?}", start_grid, goal_grid);
 
         let mut excluded = vec![entity];
         if let Some(player) = player_entity {
             excluded.push(player);
         }
 
-        let filter = SpatialQueryFilter::from_mask(GameLayer::Wall)
-            .with_excluded_entities(excluded);
+        let filter =
+            SpatialQueryFilter::from_mask(GameLayer::Wall).with_excluded_entities(excluded);
 
         // Inflate the collider shape for pathfinding margin
         let inflated_shape = Collider::rectangle(
@@ -224,7 +224,7 @@ fn draw_paths(
     mut despawn: MessageWriter<DespawnEvent>,
 ) {
     for (path_entity, path, bonded_entities) in path_query.iter_mut() {
-        info!("Draw path");
+        debug!("Draw path");
 
         let mut shape_path = ShapePath::new();
         for points in path.points.windows(2) {

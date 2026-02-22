@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use avian2d::prelude::*;
 use bevy::prelude::*;
 
+use super::proto::{self};
+use super::{GuestChannels, LocalGuestId, NetworkRole};
 use crate::ball::{BallTag, BallTextureHandle};
 use crate::camera::CameraTarget;
 use crate::game_state::GameState;
@@ -14,9 +16,6 @@ use crate::simple_figure::{
 };
 use crate::tiled::{SuppressObjectSpawn, TilemapSpawnEvent};
 use crate::PIXELS_PER_METER;
-
-use super::proto::{self};
-use super::{GuestChannels, GuestTag, LocalGuestId, NetworkRole};
 
 pub struct GuestPlugin;
 
@@ -72,16 +71,15 @@ pub fn start_guest_connection(world: &mut World, addr: String) {
 
         rt.block_on(async move {
             let endpoint = format!("http://{addr_clone}");
-            let mut client = match proto::game_session_client::GameSessionClient::connect(endpoint)
-                .await
-            {
-                Ok(c) => c,
-                Err(e) => {
-                    error!("Failed to connect to host: {e}");
-                    let _ = init_tx.send(Err(format!("Connection failed: {e}")));
-                    return;
-                }
-            };
+            let mut client =
+                match proto::game_session_client::GameSessionClient::connect(endpoint).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        error!("Failed to connect to host: {e}");
+                        let _ = init_tx.send(Err(format!("Connection failed: {e}")));
+                        return;
+                    }
+                };
 
             // Join
             let join_response = match client
@@ -237,8 +235,7 @@ fn guest_apply_pending_snapshot(
             .map(|v| Vec2::new(v.x, v.y))
             .unwrap_or_default();
 
-        let kind =
-            proto::EntityKind::try_from(entity_state.kind).unwrap_or(proto::EntityKind::Npc);
+        let kind = proto::EntityKind::try_from(entity_state.kind).unwrap_or(proto::EntityKind::Npc);
 
         let local_entity = match kind {
             proto::EntityKind::Player
@@ -261,11 +258,7 @@ fn guest_apply_pending_snapshot(
                     Collider::capsule(0.18 * PIXELS_PER_METER, 0.6 * PIXELS_PER_METER),
                     CollisionLayers::new(
                         LayerMask::from([GameLayer::Character]),
-                        LayerMask::from([
-                            GameLayer::Character,
-                            GameLayer::Wall,
-                            GameLayer::Ball,
-                        ]),
+                        LayerMask::from([GameLayer::Character, GameLayer::Wall, GameLayer::Ball]),
                     ),
                     LockedAxes::ROTATION_LOCKED,
                     LinearVelocity(vel),
@@ -295,11 +288,7 @@ fn guest_apply_pending_snapshot(
                     Collider::circle(0.1 * PIXELS_PER_METER),
                     CollisionLayers::new(
                         LayerMask::from([GameLayer::Ball]),
-                        LayerMask::from([
-                            GameLayer::Character,
-                            GameLayer::Ball,
-                            GameLayer::Wall,
-                        ]),
+                        LayerMask::from([GameLayer::Character, GameLayer::Ball, GameLayer::Wall]),
                     ),
                     LockedAxes::ROTATION_LOCKED,
                     LinearVelocity(vel),
@@ -366,8 +355,7 @@ fn guest_send_input(
         let camera = camera_query.single();
         let player_tf = player_query.iter().next();
 
-        if let (Ok(window), Ok((camera, camera_tf)), Some(player_tf)) =
-            (window, camera, player_tf)
+        if let (Ok(window), Ok((camera, camera_tf)), Some(player_tf)) = (window, camera, player_tf)
         {
             window.cursor_position().and_then(|cursor_pos| {
                 camera
@@ -401,7 +389,7 @@ fn guest_send_input(
 fn guest_apply_updates(
     mut commands: Commands,
     guest_channels: Option<Res<GuestChannels>>,
-    local_guest: Option<Res<LocalGuestId>>,
+    mut local_guest: Option<ResMut<LocalGuestId>>,
     mut entity_map: Option<ResMut<EntityMap>>,
     atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
     ball_texture: Res<BallTextureHandle>,
@@ -410,11 +398,12 @@ fn guest_apply_updates(
         Or<(With<SimpleFigureTag>, With<BallTag>)>,
     >,
     mut sync_state: Option<ResMut<super::sync::TickSyncState>>,
+    player_query: Query<Entity, With<PlayerTag>>,
 ) {
     let Some(channels) = guest_channels else {
         return;
     };
-    let Some(local_guest) = local_guest else {
+    let Some(ref mut local_guest) = local_guest else {
         return;
     };
     let Some(ref mut entity_map) = entity_map else {
@@ -462,16 +451,32 @@ fn guest_apply_updates(
         if let Some(&local_entity) = entity_map.0.get(&entity_state.entity_id) {
             // Update existing entity
             if let Ok((mut tf, mut lv)) = figure_query.get_mut(local_entity) {
-                // Interpolate position for smoothness
+                // Interpolate position for smoothness?
                 let target = Vec3::new(pos.x, pos.y, tf.translation.z);
-                tf.translation = tf.translation.lerp(target, 0.3);
+                tf.translation = target;
                 lv.0 = vel;
             }
         } else {
-            // Spawn new entity
-            let kind = proto::EntityKind::try_from(entity_state.kind).unwrap_or(proto::EntityKind::Npc);
+            // Spawn new entity — no colliders or velocity on guest side
+            let is_our_entity = entity_state.entity_id == local_guest.entity_id;
+
+            // Remove PlayerTag from old entities before spawning (avoids borrow conflict)
+            if is_our_entity {
+                for old_player in player_query.iter() {
+                    commands
+                        .entity(old_player)
+                        .remove::<(PlayerTag, CameraTarget)>();
+                }
+            }
+
+            let kind =
+                proto::EntityKind::try_from(entity_state.kind).unwrap_or(proto::EntityKind::Npc);
+
             let local_entity = match kind {
-                proto::EntityKind::Player | proto::EntityKind::Npc | proto::EntityKind::Guest | proto::EntityKind::Unspecified => {
+                proto::EntityKind::Player
+                | proto::EntityKind::Npc
+                | proto::EntityKind::Guest
+                | proto::EntityKind::Unspecified => {
                     let mut entity_commands = commands.spawn((
                         SimpleFigureTag,
                         Sprite::from_atlas_image(
@@ -499,45 +504,39 @@ fn guest_apply_updates(
                         LinearVelocity(vel),
                     ));
 
-                    // If this is our guest entity, add PlayerTag + CameraTarget
-                    if entity_state.entity_id == local_guest.entity_id {
+                    if is_our_entity {
                         entity_commands.insert((PlayerTag, CameraTarget));
-                    } else if kind == proto::EntityKind::Guest {
-                        entity_commands.insert(GuestTag(0)); // remote guest
                     }
 
-                    // Health for NPCs
                     if entity_state.health_max > 0 {
                         entity_commands.insert(Health {
                             max: entity_state.health_max,
                             current: entity_state.health_current,
-                            vulnerable_to: DamageKindMask::NONE, // Guest doesn't run damage locally
+                            vulnerable_to: DamageKindMask::NONE,
                         });
                     }
 
                     entity_commands.id()
                 }
-                proto::EntityKind::Ball => {
-                    commands
-                        .spawn((
-                            BallTag,
-                            Sprite::from_image(ball_texture.0.clone()),
-                            Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
-                            RigidBody::Kinematic,
-                            Collider::circle(0.1 * PIXELS_PER_METER),
-                            CollisionLayers::new(
-                                LayerMask::from([GameLayer::Ball]),
-                                LayerMask::from([
-                                    GameLayer::Character,
-                                    GameLayer::Ball,
-                                    GameLayer::Wall,
-                                ]),
-                            ),
-                            LockedAxes::ROTATION_LOCKED,
-                            LinearVelocity(vel),
-                        ))
-                        .id()
-                }
+                proto::EntityKind::Ball => commands
+                    .spawn((
+                        BallTag,
+                        Sprite::from_image(ball_texture.0.clone()),
+                        Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
+                        RigidBody::Kinematic,
+                        Collider::circle(0.1 * PIXELS_PER_METER),
+                        CollisionLayers::new(
+                            LayerMask::from([GameLayer::Ball]),
+                            LayerMask::from([
+                                GameLayer::Character,
+                                GameLayer::Ball,
+                                GameLayer::Wall,
+                            ]),
+                        ),
+                        LockedAxes::ROTATION_LOCKED,
+                        LinearVelocity(vel),
+                    ))
+                    .id(),
             };
 
             entity_map.0.insert(entity_state.entity_id, local_entity);

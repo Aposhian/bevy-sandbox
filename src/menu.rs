@@ -2,6 +2,7 @@ use bevy::app::AppExit;
 use bevy::prelude::*;
 
 use crate::game_state::GameState;
+use crate::net::NetworkRole;
 use crate::save::{LoadGameRequest, SaveDir, SaveGameRequest, SaveIndex, SaveTrigger};
 
 pub struct MenuPlugin;
@@ -29,6 +30,7 @@ enum MenuAction {
     HostGame,
     ShowJoin,
     JoinGame,
+    Disconnect,
     Exit,
     LoadFile(String),
     Back,
@@ -41,7 +43,7 @@ const NORMAL_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
 const HOVERED_BUTTON: Color = Color::srgb(0.35, 0.35, 0.35);
 const PRESSED_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 
-fn spawn_menu(mut commands: Commands) {
+fn spawn_menu(mut commands: Commands, role: Res<NetworkRole>) {
     let root = commands
         .spawn((
             MenuRoot,
@@ -58,7 +60,7 @@ fn spawn_menu(mut commands: Commands) {
         ))
         .id();
 
-    spawn_main_panel_under(&mut commands, root);
+    spawn_main_panel_under(&mut commands, root, &role);
 }
 
 fn panel_node() -> Node {
@@ -72,7 +74,7 @@ fn panel_node() -> Node {
     }
 }
 
-fn spawn_main_panel_under(commands: &mut Commands, parent: Entity) {
+fn spawn_main_panel_under(commands: &mut Commands, parent: Entity, role: &NetworkRole) {
     let panel = commands
         .spawn((
             MenuPanel,
@@ -100,10 +102,21 @@ fn spawn_main_panel_under(commands: &mut Commands, parent: Entity) {
     commands.entity(panel).add_child(title);
 
     spawn_button_under(commands, panel, "Resume", MenuAction::Resume);
-    spawn_button_under(commands, panel, "Save Game", MenuAction::QuickSave);
-    spawn_button_under(commands, panel, "Load Game", MenuAction::ShowLoad);
-    spawn_button_under(commands, panel, "Host Game", MenuAction::HostGame);
-    spawn_button_under(commands, panel, "Join Game", MenuAction::ShowJoin);
+
+    match role {
+        NetworkRole::Guest { .. } => {
+            // Guests only see Resume, Disconnect, Exit
+            spawn_button_under(commands, panel, "Disconnect", MenuAction::Disconnect);
+        }
+        _ => {
+            // Host or Offline: full menu
+            spawn_button_under(commands, panel, "Save Game", MenuAction::QuickSave);
+            spawn_button_under(commands, panel, "Load Game", MenuAction::ShowLoad);
+            spawn_button_under(commands, panel, "Host Game", MenuAction::HostGame);
+            spawn_button_under(commands, panel, "Join Game", MenuAction::ShowJoin);
+        }
+    }
+
     spawn_button_under(commands, panel, "Exit Game", MenuAction::Exit);
 }
 
@@ -313,9 +326,11 @@ fn menu_actions(
     mut save_requests: MessageWriter<SaveGameRequest>,
     mut load_requests: MessageWriter<LoadGameRequest>,
     save_dir: Res<SaveDir>,
+    role: Res<NetworkRole>,
     menu_root: Query<Entity, With<MenuRoot>>,
     panels: Query<Entity, With<MenuPanel>>,
     join_input: Query<&Text, With<JoinAddrInput>>,
+    guest_entities: Query<Entity, With<crate::simple_figure::SimpleFigureTag>>,
 ) {
     for (interaction, action) in interaction_query.iter() {
         if *interaction != Interaction::Pressed {
@@ -359,6 +374,18 @@ fn menu_actions(
                 info!("Joining game at {addr}");
                 next_state.set(GameState::Playing);
             }
+            MenuAction::Disconnect => {
+                // Remove guest resources and despawn guest-created entities
+                commands.remove_resource::<crate::net::GuestChannels>();
+                commands.remove_resource::<crate::net::LocalGuestId>();
+                commands.remove_resource::<crate::net::guest::EntityMap>();
+                commands.insert_resource(NetworkRole::Offline);
+                for entity in guest_entities.iter() {
+                    commands.entity(entity).despawn();
+                }
+                info!("Disconnected from host");
+                next_state.set(GameState::Playing);
+            }
             MenuAction::Exit => {
                 exit.write(AppExit::Success);
             }
@@ -368,7 +395,7 @@ fn menu_actions(
                 });
             }
             MenuAction::Back => {
-                rebuild_with_main(&mut commands, &menu_root, &panels);
+                rebuild_with_main(&mut commands, &menu_root, &panels, &role);
             }
         }
     }
@@ -409,13 +436,14 @@ fn rebuild_with_main(
     commands: &mut Commands,
     menu_root: &Query<Entity, With<MenuRoot>>,
     panels: &Query<Entity, With<MenuPanel>>,
+    role: &NetworkRole,
 ) {
     for entity in panels.iter() {
         commands.entity(entity).despawn();
     }
 
     if let Some(root) = menu_root.iter().next() {
-        spawn_main_panel_under(commands, root);
+        spawn_main_panel_under(commands, root, role);
     }
 }
 

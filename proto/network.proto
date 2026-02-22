@@ -21,6 +21,7 @@ message EntityState {
   int32 health_max = 4;
   int32 health_current = 5;
   EntityKind kind = 6;
+  uint32 guest_id = 7;
 }
 
 message WorldSnapshot {

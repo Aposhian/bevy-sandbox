@@ -16,7 +16,7 @@ use crate::PIXELS_PER_METER;
 use super::proto::game_session_server::{GameSession, GameSessionServer};
 use super::proto::{self};
 use super::{
-    GuestIdCounter, GuestInputEvent, GuestTag, HostChannels, HostTick,
+    ConnectedGuests, GuestIdCounter, GuestInputEvent, GuestTag, HostChannels, HostTick,
     JoinEvent, JoinResponseData, LeaveEvent, NetworkRole,
 };
 
@@ -25,6 +25,7 @@ pub struct HostPlugin;
 impl Plugin for HostPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PreviousBroadcastEntities>()
+        .init_resource::<ConnectedGuests>()
         .add_systems(
             FixedUpdate,
             (host_tick_increment, host_broadcast)
@@ -258,6 +259,7 @@ fn host_broadcast(
             health_max: health.map(|h| h.max).unwrap_or(0),
             health_current: health.map(|h| h.current).unwrap_or(0),
             kind: proto::EntityKind::Player.into(),
+            guest_id: 0,
         });
     }
 
@@ -273,6 +275,7 @@ fn host_broadcast(
             health_max: health.max,
             health_current: health.current,
             kind: proto::EntityKind::Npc.into(),
+            guest_id: 0,
         });
     }
 
@@ -288,8 +291,8 @@ fn host_broadcast(
             health_max: health.map(|h| h.max).unwrap_or(0),
             health_current: health.map(|h| h.current).unwrap_or(0),
             kind: proto::EntityKind::Guest.into(),
+            guest_id: guest_tag.0,
         });
-        let _ = guest_tag; // used in query filter
     }
 
     // Balls
@@ -304,6 +307,7 @@ fn host_broadcast(
             health_max: health.max,
             health_current: health.current,
             kind: proto::EntityKind::Ball.into(),
+            guest_id: 0,
         });
     }
 
@@ -344,6 +348,7 @@ fn host_handle_joins(
     mut commands: Commands,
     channels: Option<Res<HostChannels>>,
     guest_id_counter: ResMut<GuestIdCounter>,
+    mut connected_guests: ResMut<ConnectedGuests>,
     tick: Res<HostTick>,
     map_path: Res<crate::save::CurrentMapPath>,
     atlas_handle: Res<crate::simple_figure::SimpleFigureTextureAtlasHandle>,
@@ -376,11 +381,19 @@ fn host_handle_joins(
         );
 
         // Spawn a new SimpleFigure for the guest
-        // Place near the host player or at origin
+        // Place near the host player using offset based on guest count
+        let guest_index = (connected_guests.0.len() + 1) as f32;
         let spawn_pos = player_query
             .iter()
             .next()
-            .map(|(_, tf, _, _)| Vec2::new(tf.translation.x + 32.0, tf.translation.y))
+            .map(|(_, tf, _, _)| {
+                let offset = if guest_index as i32 % 2 == 1 {
+                    Vec2::new(32.0 * ((guest_index + 1.0) / 2.0).ceil(), 0.0)
+                } else {
+                    Vec2::new(-32.0 * (guest_index / 2.0).ceil(), 0.0)
+                };
+                Vec2::new(tf.translation.x + offset.x, tf.translation.y + offset.y)
+            })
             .unwrap_or(Vec2::ZERO);
 
         let guest_entity = commands.spawn((
@@ -413,6 +426,8 @@ fn host_handle_joins(
         )).id();
         let guest_entity_bits = guest_entity.to_bits();
 
+        connected_guests.0.insert(guest_id, guest_entity);
+
         // Build world snapshot
         let mut entities = Vec::new();
 
@@ -427,6 +442,7 @@ fn host_handle_joins(
                 health_max: health.map(|h| h.max).unwrap_or(0),
                 health_current: health.map(|h| h.current).unwrap_or(0),
                 kind: proto::EntityKind::Player.into(),
+                guest_id: 0,
             });
         }
 
@@ -441,6 +457,7 @@ fn host_handle_joins(
                 health_max: health.max,
                 health_current: health.current,
                 kind: proto::EntityKind::Npc.into(),
+                guest_id: 0,
             });
         }
 
@@ -455,6 +472,7 @@ fn host_handle_joins(
                 health_max: health.max,
                 health_current: health.current,
                 kind: proto::EntityKind::Ball.into(),
+                guest_id: 0,
             });
         }
 
@@ -469,8 +487,8 @@ fn host_handle_joins(
                 health_max: health.map(|h| h.max).unwrap_or(0),
                 health_current: health.map(|h| h.current).unwrap_or(0),
                 kind: proto::EntityKind::Guest.into(),
+                guest_id: guest_tag.0,
             });
-            let _ = guest_tag;
         }
 
         // Add the newly spawned guest entity to the snapshot
@@ -485,6 +503,7 @@ fn host_handle_joins(
             health_max: 0,
             health_current: 0,
             kind: proto::EntityKind::Guest.into(),
+            guest_id,
         });
 
         let snapshot = proto::WorldSnapshot {
@@ -504,17 +523,76 @@ fn host_handle_joins(
 fn host_handle_leaves(
     mut commands: Commands,
     channels: Option<Res<HostChannels>>,
+    mut connected_guests: ResMut<ConnectedGuests>,
     guest_query: Query<(Entity, &GuestTag)>,
 ) {
     let Some(channels) = channels else { return };
 
     while let Ok(leave) = channels.leave_rx.try_recv() {
         info!("Guest {} leaving", leave.guest_id);
+        connected_guests.0.remove(&leave.guest_id);
         for (entity, tag) in guest_query.iter() {
             if tag.0 == leave.guest_id {
                 commands.entity(entity).despawn();
             }
         }
+    }
+}
+
+/// Respawn entities for all connected guests near the host player.
+/// Called after a save load on the host side.
+pub fn respawn_connected_guests(
+    commands: &mut Commands,
+    connected_guests: &mut ConnectedGuests,
+    host_player_pos: Vec2,
+    atlas_handle: &crate::simple_figure::SimpleFigureTextureAtlasHandle,
+) {
+    let mut i = 0u32;
+    for (guest_id, entity) in connected_guests.0.iter_mut() {
+        i += 1;
+        let offset = if i % 2 == 1 {
+            Vec2::new(32.0 * ((i + 1) as f32 / 2.0).ceil(), 0.0)
+        } else {
+            Vec2::new(-32.0 * (i as f32 / 2.0).ceil(), 0.0)
+        };
+        let spawn_pos = host_player_pos + offset;
+
+        let new_entity = commands
+            .spawn((
+                SimpleFigureTag,
+                GuestTag(*guest_id),
+                Sprite::from_atlas_image(
+                    atlas_handle.texture.clone(),
+                    TextureAtlas {
+                        layout: atlas_handle.layout.clone(),
+                        index: 0,
+                    },
+                ),
+                Transform::from_translation(Vec3::new(spawn_pos.x, spawn_pos.y, 2.0)),
+                crate::simple_figure::AnimationIndices { first: 0, last: 2 },
+                crate::simple_figure::AnimationTimer(Timer::from_seconds(
+                    0.1,
+                    TimerMode::Repeating,
+                )),
+                RigidBody::Dynamic,
+                Collider::capsule(0.18 * PIXELS_PER_METER, 0.6 * PIXELS_PER_METER),
+                CollisionLayers::new(
+                    LayerMask::from([crate::simple_figure::GameLayer::Character]),
+                    LayerMask::from([
+                        crate::simple_figure::GameLayer::Character,
+                        crate::simple_figure::GameLayer::Wall,
+                        crate::simple_figure::GameLayer::Ball,
+                    ]),
+                ),
+                CollisionEventsEnabled,
+                LockedAxes::ROTATION_LOCKED,
+                MoveAction::default(),
+                LinearVelocity::default(),
+            ))
+            .id();
+
+        info!("Respawned guest {guest_id} as entity {new_entity:?} at ({}, {})", spawn_pos.x, spawn_pos.y);
+        *entity = new_entity;
     }
 }
 
