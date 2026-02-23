@@ -20,7 +20,7 @@
 ## Multiplayer
 
 ### Network
-- [ ] Save compatibility
+- [x] Save compatibility
 - [ ] Join/Drop notifications
 
 ### Local
@@ -29,7 +29,7 @@
 
 ## UI
 - [ ] Inventory UI
-- [ ] Splash screen
+- [x] Splash screen
 - [ ] Basic volume settings
   - [ ] master volume
   - [ ] music volume
@@ -37,7 +37,7 @@
   - [ ] dialogue volume
 - [ ] Cheat codes!
 - [ ] Achievements
-- [ ] Multiplayer unanimous pause
+- [x] Multiplayer unanimous pause
 
 ### Debug
 - [ ] Show connected guests
@@ -46,7 +46,6 @@
 - [x] Auto save
 - [x] User triggered save
 - [ ] Event triggered save
-- [ ]
 
 ## Levels
 - [ ] Fix tiled object rotation handling
@@ -64,6 +63,5 @@
 - [ ] Tiled object rotations not handled correctly
 
 ## Chores
-- [ ] Add unit tests
+- [x] Add unit tests
 - [ ] Add testing/simulation harness for AI code agents
-- [ ]
