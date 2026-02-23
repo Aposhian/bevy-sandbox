@@ -29,6 +29,9 @@ tokio-stream = "0.1"
 prost-build = "0.13"
 tonic-build = "0.12"
 
+[dev-dependencies]
+rand = "0.9"
+
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
 opt-level = 1

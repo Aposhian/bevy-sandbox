@@ -16,6 +16,9 @@ use bevy::ecs::error::DefaultErrorHandler;
 
 use crate::SandboxPlugins;
 use crate::game_state::GameState;
+use crate::net::{
+    ConnectedGuests, GuestIdCounter, HostChannels, HostTick, NetworkRole, PauseVotes,
+};
 
 /// Minimal set of Bevy plugins that lets [`SandboxPlugins`] initialise without
 /// opening a window or creating a renderer.
@@ -183,5 +186,40 @@ impl TestApp {
     /// Get a reference to a resource.
     pub fn resource<T: Resource>(&self) -> &T {
         self.app.world().resource::<T>()
+    }
+
+    /// Configure this app as a network host (without starting a real gRPC server).
+    /// Inserts `NetworkRole::Host`, `HostChannels`, `ConnectedGuests`, etc.
+    /// Returns the `HostChannels` default so tests can send events through the
+    /// crossbeam senders.
+    pub fn setup_host_mode(&mut self) -> HostChannels {
+        let channels = HostChannels::default();
+        let channels_clone = HostChannels {
+            join_rx: channels.join_rx.clone(),
+            join_tx: channels.join_tx.clone(),
+            input_rx: channels.input_rx.clone(),
+            input_tx: channels.input_tx.clone(),
+            leave_rx: channels.leave_rx.clone(),
+            leave_tx: channels.leave_tx.clone(),
+        };
+        self.app
+            .world_mut()
+            .insert_resource(NetworkRole::Host { port: 0 });
+        self.app.world_mut().insert_resource(channels);
+        self.app
+            .world_mut()
+            .insert_resource(ConnectedGuests::default());
+        self.app
+            .world_mut()
+            .insert_resource(GuestIdCounter::default());
+        self.app
+            .world_mut()
+            .insert_resource(PauseVotes::default());
+        channels_clone
+    }
+
+    /// Read the current [`HostTick`] value.
+    pub fn host_tick(&self) -> u64 {
+        self.app.world().resource::<HostTick>().0
     }
 }
