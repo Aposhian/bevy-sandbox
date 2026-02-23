@@ -4,22 +4,23 @@ use bevy::prelude::*;
 #[cfg(feature = "path_debug")]
 use bevy_prototype_lyon::plugin::ShapePlugin;
 
-mod ai;
-mod ball;
-mod camera;
-mod ecs;
+pub mod ai;
+pub mod ball;
+pub mod camera;
+pub mod ecs;
 #[cfg(feature = "debug_display")]
 mod debug_display;
 pub mod game_state;
-mod health;
-mod input;
-mod menu;
+pub mod health;
+pub mod input;
+pub mod menu;
 pub mod net;
 pub mod obstacle;
-mod pathfinding;
-mod pathfollowing;
+pub mod pathfinding;
+pub mod pathfollowing;
 pub mod save;
 pub mod simple_figure;
+pub mod testing;
 pub mod tiled;
 
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
