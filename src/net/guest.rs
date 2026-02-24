@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use avian2d::prelude::*;
 use bevy::prelude::*;
@@ -34,6 +34,13 @@ impl Plugin for GuestPlugin {
                 .run_if(not(in_state(GameState::MainMenu))),
         )
         .add_systems(
+            Update,
+            guest_interpolate
+                .after(guest_apply_updates)
+                .run_if(is_guest)
+                .run_if(not(in_state(GameState::MainMenu))),
+        )
+        .add_systems(
             OnEnter(GameState::Paused),
             guest_send_pause_state.run_if(is_guest),
         )
@@ -45,6 +52,91 @@ impl Plugin for GuestPlugin {
             Update,
             guest_apply_pending_snapshot.run_if(resource_exists::<PendingSnapshot>),
         );
+    }
+}
+
+/// Per-entity interpolation state for smooth rendering between server updates.
+///
+/// Uses a timeline buffer: server positions are placed on a timeline spaced
+/// by `SERVER_TICK_DURATION`. A playback cursor advances with real time and
+/// the rendered position is linearly interpolated between the two surrounding
+/// timeline entries. If the buffer grows too large, old entries are discarded
+/// to stay current.
+#[derive(Component)]
+pub struct NetInterpolation {
+    /// Timeline of positions. Entry 0 is at time `base_time`.
+    /// Each subsequent entry is `SERVER_TICK_DURATION` later.
+    timeline: VecDeque<Vec3>,
+    /// The time of `timeline[0]`.
+    base_time: f32,
+    /// Current playback cursor (absolute time).
+    cursor: f32,
+}
+
+/// One server fixed-update tick (Bevy default: 64 Hz).
+const SERVER_TICK_DURATION: f32 = 1.0 / 64.0;
+
+impl NetInterpolation {
+    fn new(pos: Vec3) -> Self {
+        Self {
+            timeline: VecDeque::from([pos]),
+            base_time: 0.0,
+            cursor: 0.0,
+        }
+    }
+
+    /// Enqueue a new server position onto the timeline.
+    fn push(&mut self, new_pos: Vec3) {
+        let was_starved = self.timeline.len() < 2;
+        self.timeline.push_back(new_pos);
+
+        // On first real update (going from 1 to 2+ entries), reset cursor
+        // so it interpolates across the first segment from the beginning.
+        if was_starved && self.timeline.len() >= 2 {
+            self.cursor = self.base_time;
+        }
+    }
+
+    /// Advance cursor by `dt` and return the interpolated position.
+    fn step(&mut self, dt: f32) -> Vec3 {
+        // Cap advancement at one tick to prevent traversing multiple
+        // segments in a single frame (which causes visible jumps).
+        // The tick sync system adjusts Time<Virtual> to keep the guest's
+        // update rate aligned with the host, so this cap doesn't cause drift.
+        self.cursor += dt.min(SERVER_TICK_DURATION);
+
+        // Compute position FIRST, then trim consumed segments.
+        let pos = self.current_pos();
+
+        // Trim fully consumed segments (cursor has moved past them).
+        // Keep at least 2 entries so we always have a segment to interpolate.
+        while self.timeline.len() > 2
+            && self.cursor >= self.base_time + SERVER_TICK_DURATION
+        {
+            self.timeline.pop_front();
+            self.base_time += SERVER_TICK_DURATION;
+        }
+
+        pos
+    }
+
+    /// Current interpolated position without advancing time.
+    fn current_pos(&self) -> Vec3 {
+        if self.timeline.len() < 2 {
+            return *self.timeline.back().unwrap_or(&Vec3::ZERO);
+        }
+
+        // Find which segment the cursor is in and interpolate within it.
+        let end_time =
+            self.base_time + (self.timeline.len() - 1) as f32 * SERVER_TICK_DURATION;
+        let clamped = self.cursor.clamp(self.base_time, end_time);
+
+        let local = clamped - self.base_time;
+        let seg = (local / SERVER_TICK_DURATION) as usize;
+        let seg = seg.min(self.timeline.len() - 2);
+        let t = (local - seg as f32 * SERVER_TICK_DURATION) / SERVER_TICK_DURATION;
+
+        self.timeline[seg].lerp(self.timeline[seg + 1], t)
     }
 }
 
@@ -258,6 +350,7 @@ fn guest_apply_pending_snapshot(
             | proto::EntityKind::Npc
             | proto::EntityKind::Guest
             | proto::EntityKind::Unspecified => {
+                let spawn_pos = Vec3::new(pos.x, pos.y, 2.0);
                 let mut ecmds = commands.spawn((
                     SimpleFigureTag,
                     Sprite::from_atlas_image(
@@ -267,7 +360,7 @@ fn guest_apply_pending_snapshot(
                             index: 0,
                         },
                     ),
-                    Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
+                    Transform::from_translation(spawn_pos),
                     AnimationIndices { first: 0, last: 2 },
                     AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
                     RigidBody::Kinematic,
@@ -278,6 +371,7 @@ fn guest_apply_pending_snapshot(
                     ),
                     LockedAxes::ROTATION_LOCKED,
                     LinearVelocity(vel),
+                    NetInterpolation::new(spawn_pos),
                 ));
 
                 // This guest's own entity gets PlayerTag + CameraTarget
@@ -295,21 +389,29 @@ fn guest_apply_pending_snapshot(
 
                 ecmds.id()
             }
-            proto::EntityKind::Ball => commands
-                .spawn((
-                    BallTag,
-                    Sprite::from_image(ball_texture.0.clone()),
-                    Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
-                    RigidBody::Kinematic,
-                    Collider::circle(0.1 * PIXELS_PER_METER),
-                    CollisionLayers::new(
-                        LayerMask::from([GameLayer::Ball]),
-                        LayerMask::from([GameLayer::Character, GameLayer::Ball, GameLayer::Wall]),
-                    ),
-                    LockedAxes::ROTATION_LOCKED,
-                    LinearVelocity(vel),
-                ))
-                .id(),
+            proto::EntityKind::Ball => {
+                let spawn_pos = Vec3::new(pos.x, pos.y, 2.0);
+                commands
+                    .spawn((
+                        BallTag,
+                        Sprite::from_image(ball_texture.0.clone()),
+                        Transform::from_translation(spawn_pos),
+                        RigidBody::Kinematic,
+                        Collider::circle(0.1 * PIXELS_PER_METER),
+                        CollisionLayers::new(
+                            LayerMask::from([GameLayer::Ball]),
+                            LayerMask::from([
+                                GameLayer::Character,
+                                GameLayer::Ball,
+                                GameLayer::Wall,
+                            ]),
+                        ),
+                        LockedAxes::ROTATION_LOCKED,
+                        LinearVelocity(vel),
+                        NetInterpolation::new(spawn_pos),
+                    ))
+                    .id()
+            }
         };
 
         map.insert(entity_state.entity_id, local_entity);
@@ -438,7 +540,7 @@ fn guest_apply_updates(
     atlas_handle: Res<SimpleFigureTextureAtlasHandle>,
     ball_texture: Res<BallTextureHandle>,
     mut figure_query: Query<
-        (&mut Transform, &mut LinearVelocity),
+        (&mut Transform, &mut LinearVelocity, &mut NetInterpolation),
         Or<(With<SimpleFigureTag>, With<BallTag>)>,
     >,
     mut sync_state: Option<ResMut<super::sync::TickSyncState>>,
@@ -460,21 +562,18 @@ fn guest_apply_updates(
         return;
     };
 
-    // Drain all pending updates; accumulate despawns from every update
-    // but use only the latest for entity positions.
-    let mut all_despawned: Vec<u64> = Vec::new();
-    let mut latest_update: Option<proto::WorldUpdate> = None;
+    // Drain all pending updates into a vec. Each update is pushed into
+    // per-entity interpolation timelines, keeping every position for smooth
+    // interpolation. The timeline buffer handles overflow internally.
+    let mut pending: Vec<proto::WorldUpdate> = Vec::new();
     while let Ok(update) = channels.update_rx.try_recv() {
-        all_despawned.extend_from_slice(&update.despawned);
-        latest_update = Some(update);
+        pending.push(update);
     }
 
-    // If no updates received, check if channel is disconnected (host dropped).
-    // Since the guest doesn't hold the Sender, a disconnected receiver means
-    // the background streaming thread (and thus the host connection) is gone.
-    if latest_update.is_none() {
-        // Peek with try_recv one more time to distinguish Empty from Disconnected
+    if pending.is_empty() {
+        // Check for disconnect
         match channels.update_rx.try_recv() {
+            Err(crossbeam_channel::TryRecvError::Empty) => return,
             Err(crossbeam_channel::TryRecvError::Disconnected) => {
                 warn!("Host disconnected, returning to main menu");
                 commands.remove_resource::<GuestChannels>();
@@ -496,35 +595,66 @@ fn guest_apply_updates(
                 next_state.set(GameState::MainMenu);
                 return;
             }
-            Err(crossbeam_channel::TryRecvError::Empty) => return,
             Ok(update) => {
-                // Got a late update after all
-                all_despawned.extend_from_slice(&update.despawned);
-                latest_update = Some(update);
+                pending.push(update);
             }
         }
     }
 
-    let Some(update) = latest_update else { return };
+    if pending.is_empty() {
+        return;
+    }
 
-    // Track host's all_paused state
-    host_all_paused.0 = update.all_paused;
-
-    // Update tick sync
+    // Use the latest update for metadata (pause state, tick sync, spawns).
+    let latest = pending.last().unwrap();
+    host_all_paused.0 = latest.all_paused;
     if let Some(ref mut sync) = sync_state {
-        sync.last_host_tick = update.host_tick;
+        sync.last_host_tick = latest.host_tick;
     }
 
-    // Handle despawned entities (from ALL drained updates, not just the latest)
-    for despawned_id in &all_despawned {
-        if let Some(local_entity) = entity_map.0.remove(despawned_id) {
-            if let Ok(mut entity_commands) = commands.get_entity(local_entity) {
-                entity_commands.despawn();
+    // Process despawns from ALL updates so we never miss one
+    for update in &pending {
+        for despawned_id in &update.despawned {
+            if let Some(local_entity) = entity_map.0.remove(despawned_id) {
+                if let Ok(mut entity_commands) = commands.get_entity(local_entity) {
+                    entity_commands.despawn();
+                }
             }
         }
     }
 
-    // Update or spawn entities
+    // Push every update's positions into per-entity interpolation timelines.
+    // This gives the timeline buffer multiple entries to interpolate across
+    // smoothly, rather than skipping to the latest and jerking.
+    for update in &pending {
+        for entity_state in &update.entities {
+            let pos = entity_state
+                .position
+                .as_ref()
+                .map(|p| Vec2::new(p.x, p.y))
+                .unwrap_or_default();
+
+            if let Some(&local_entity) = entity_map.0.get(&entity_state.entity_id) {
+                if let Ok((tf, mut lv, mut interp)) = figure_query.get_mut(local_entity) {
+                    let target = Vec3::new(pos.x, pos.y, tf.translation.z);
+                    interp.push(target);
+
+                    // Update velocity from the latest update only
+                    if std::ptr::eq(update, pending.last().unwrap()) {
+                        let vel = entity_state
+                            .velocity
+                            .as_ref()
+                            .map(|v| Vec2::new(v.x, v.y))
+                            .unwrap_or_default();
+                        lv.0 = vel;
+                    }
+                }
+            }
+        }
+    }
+
+    // Spawn new entities from the latest update only
+    let update = pending.last().unwrap();
     for entity_state in &update.entities {
         let pos = entity_state
             .position
@@ -537,16 +667,12 @@ fn guest_apply_updates(
             .map(|v| Vec2::new(v.x, v.y))
             .unwrap_or_default();
 
-        if let Some(&local_entity) = entity_map.0.get(&entity_state.entity_id) {
-            // Update existing entity
-            if let Ok((mut tf, mut lv)) = figure_query.get_mut(local_entity) {
-                // Interpolate position for smoothness?
-                let target = Vec3::new(pos.x, pos.y, tf.translation.z);
-                tf.translation = target;
-                lv.0 = vel;
-            }
-        } else {
-            // Spawn new entity — no colliders or velocity on guest side
+        if entity_map.0.contains_key(&entity_state.entity_id) {
+            continue; // Already handled in the per-update loop above
+        }
+
+        {
+            // Spawn new entity
             let is_our_entity = entity_state.entity_id == local_guest.entity_id;
 
             // Remove PlayerTag from old entities before spawning (avoids borrow conflict)
@@ -566,6 +692,7 @@ fn guest_apply_updates(
                 | proto::EntityKind::Npc
                 | proto::EntityKind::Guest
                 | proto::EntityKind::Unspecified => {
+                    let spawn_pos = Vec3::new(pos.x, pos.y, 2.0);
                     let mut entity_commands = commands.spawn((
                         SimpleFigureTag,
                         Sprite::from_atlas_image(
@@ -575,7 +702,7 @@ fn guest_apply_updates(
                                 index: 0,
                             },
                         ),
-                        Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
+                        Transform::from_translation(spawn_pos),
                         AnimationIndices { first: 0, last: 2 },
                         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
                         RigidBody::Kinematic,
@@ -591,6 +718,7 @@ fn guest_apply_updates(
                         LockedAxes::ROTATION_LOCKED,
                         MoveAction::default(),
                         LinearVelocity(vel),
+                        NetInterpolation::new(spawn_pos),
                     ));
 
                     if is_our_entity {
@@ -607,28 +735,49 @@ fn guest_apply_updates(
 
                     entity_commands.id()
                 }
-                proto::EntityKind::Ball => commands
-                    .spawn((
-                        BallTag,
-                        Sprite::from_image(ball_texture.0.clone()),
-                        Transform::from_translation(Vec3::new(pos.x, pos.y, 2.0)),
-                        RigidBody::Kinematic,
-                        Collider::circle(0.1 * PIXELS_PER_METER),
-                        CollisionLayers::new(
-                            LayerMask::from([GameLayer::Ball]),
-                            LayerMask::from([
-                                GameLayer::Character,
-                                GameLayer::Ball,
-                                GameLayer::Wall,
-                            ]),
-                        ),
-                        LockedAxes::ROTATION_LOCKED,
-                        LinearVelocity(vel),
-                    ))
-                    .id(),
+                proto::EntityKind::Ball => {
+                    let spawn_pos = Vec3::new(pos.x, pos.y, 2.0);
+                    commands
+                        .spawn((
+                            BallTag,
+                            Sprite::from_image(ball_texture.0.clone()),
+                            Transform::from_translation(spawn_pos),
+                            RigidBody::Kinematic,
+                            Collider::circle(0.1 * PIXELS_PER_METER),
+                            CollisionLayers::new(
+                                LayerMask::from([GameLayer::Ball]),
+                                LayerMask::from([
+                                    GameLayer::Character,
+                                    GameLayer::Ball,
+                                    GameLayer::Wall,
+                                ]),
+                            ),
+                            LockedAxes::ROTATION_LOCKED,
+                            LinearVelocity(vel),
+                            NetInterpolation::new(spawn_pos),
+                        ))
+                        .id()
+                }
             };
 
             entity_map.0.insert(entity_state.entity_id, local_entity);
         }
+    }
+}
+
+/// Smoothly interpolates entity positions between server snapshots each frame
+/// by advancing the playback cursor through the buffered timeline.
+fn guest_interpolate(
+    time: Res<Time>,
+    mut query: Query<
+        (&mut Transform, &mut NetInterpolation),
+        Or<(With<SimpleFigureTag>, With<BallTag>)>,
+    >,
+) {
+    let dt = time.delta_secs();
+    for (mut tf, mut interp) in query.iter_mut() {
+        let pos = interp.step(dt);
+        // Preserve the z coordinate (sprite layer)
+        tf.translation = Vec3::new(pos.x, pos.y, tf.translation.z);
     }
 }

@@ -2,6 +2,7 @@
 
 ## Graphics
 - [ ] Lighting
+  - [ ] Normal maps
 - [ ] Shader effects
 
 ## Audio
